@@ -62,8 +62,8 @@ export class AdminService {
     return this.http.get(`${this.API}/tickets/${ticketId}/archivo-original`, { responseType: 'blob' });
   }
 
-  // ── Wiki Reglas ─────────────────────────────────────────────────────────────
-  getReglas(): Observable<{ ok: boolean; reglas: any[] }> {
+  // ── Wiki Reglas (legacy) ───────────────────────────────────────────────
+  getReglasWiki(): Observable<{ ok: boolean; reglas: any[] }> {
     return this.http.get<any>(`${this.API}/wiki/reglas`);
   }
 
@@ -80,8 +80,8 @@ export class AdminService {
     return this.http.get<any>(`${this.API}/admin/historial`);
   }
 
-  // ── Base de Conocimiento (Reglas) ────────────────────────────────────────────
-  getReglas(page = 1, limit = 50): Observable<{ ok: boolean; reglas: any[]; total: number; pages: number }> {
+  // ── Base de Conocimiento (Reglas) ──────────────────────────────────────────
+  getReglas(page = 1, limit = 50): Observable<{ ok: boolean; reglas: any[]; total: number; page: number; pages: number }> {
     return this.http.get<any>(`${this.API}/admin/reglas?page=${page}&limit=${limit}`);
   }
 
