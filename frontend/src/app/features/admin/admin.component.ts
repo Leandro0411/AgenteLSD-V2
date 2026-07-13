@@ -10,7 +10,7 @@ type AdminTab = 'usuarios' | 'tickets' | 'normativas' | 'historial' | 'conocimie
   styleUrls: ['./admin.component.scss'],
 })
 export class AdminComponent implements OnInit {
-  tabActiva = 'usuarios';
+  tabActiva: string = 'usuarios';
 
   // ── Usuarios ────────────────────────────────────────────────────────────────
   usuarios: any[]   = [];
