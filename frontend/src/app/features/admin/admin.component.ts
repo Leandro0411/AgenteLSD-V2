@@ -204,6 +204,7 @@ export class AdminComponent implements OnInit {
         this.normativaCargando = false;
         this.pdfSeleccionado   = null;
         this.cargarNormativas();
+        this.cargarReglas(1); // recargar reglas para mostrar las nuevas en el tab Conocimiento
       },
       error: (err) => {
         this.normativaMsg      = err.error?.error || 'Error subiendo el PDF.';

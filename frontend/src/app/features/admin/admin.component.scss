@@ -220,6 +220,33 @@
 }
 
 /* ── BASE DE CONOCIMIENTO ── */
+.upload-pdf-section {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.upload-pdf-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.upload-pdf-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.upload-pdf-btn {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+}
+
 .conocimiento-header {
   display: flex;
   justify-content: space-between;

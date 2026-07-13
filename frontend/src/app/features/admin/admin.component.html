@@ -230,8 +230,46 @@
         </div>
       </div>
 
-      <!-- Mensaje de estado -->
-      <p *ngIf="reglaMsg" class="regla-msg" [class.ok]="reglaMsg.startsWith('✅')">{{ reglaMsg }}</p>
+      <!-- Mensaje de estado (upload + reglas) -->
+      <p *ngIf="normativaMsg || reglaMsg" class="regla-msg"
+         [class.ok]="(normativaMsg && !normativaMsg.includes('Error')) || reglaMsg.startsWith('✅')">
+        {{ normativaMsg || reglaMsg }}
+      </p>
+
+      <!-- ── Subir PDF de normativa ── -->
+      <div class="upload-pdf-section">
+        <h3 class="upload-pdf-title">📄 Subir PDF de normativa</h3>
+        <p class="upload-pdf-sub">La IA leerá el PDF y agregará las reglas extraídas a esta lista para que puedas editarlas.</p>
+
+        <div
+          class="dropzone-admin"
+          [class.dragover]="dragOverNormativa"
+          [class.selected]="pdfSeleccionado"
+          (dragover)="onDragOverNormativa($event)"
+          (dragleave)="onDragLeaveNormativa()"
+          (drop)="onDropNormativa($event)"
+          (click)="pdfInputConocimiento.click()"
+        >
+          <input #pdfInputConocimiento id="input-pdf-conocimiento" type="file" accept=".pdf" hidden (change)="onPdfInput($event)" />
+
+          <div *ngIf="!pdfSeleccionado" class="dropzone-placeholder">
+            <span class="drop-icon">📄</span>
+            <p>Soltá el PDF acá o <strong>hacé clic</strong> para seleccionarlo</p>
+          </div>
+
+          <div *ngIf="pdfSeleccionado" class="dropzone-selected">
+            <span class="drop-icon">✅</span>
+            <p><strong>{{ pdfSeleccionado.name }}</strong></p>
+            <small>{{ (pdfSeleccionado.size / 1024 / 1024).toFixed(2) }} MB</small>
+          </div>
+        </div>
+
+        <button id="btn-extraer-pdf" class="btn-primary upload-pdf-btn"
+          (click)="subirNormativa()"
+          [disabled]="!pdfSeleccionado || normativaCargando">
+          {{ normativaCargando ? '⏳ Procesando con IA (puede tardar un minuto)...' : '🤖 Extraer reglas del PDF' }}
+        </button>
+      </div>
 
       <!-- Form nueva regla -->
       <div *ngIf="mostrarFormNuevaRegla" class="nueva-regla-form">
