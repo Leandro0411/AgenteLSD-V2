@@ -80,7 +80,24 @@ export class AdminService {
     return this.http.get<any>(`${this.API}/admin/historial`);
   }
 
-  // ── Health ──────────────────────────────────────────────────────────────────
+  // ── Base de Conocimiento (Reglas) ────────────────────────────────────────────
+  getReglas(page = 1, limit = 50): Observable<{ ok: boolean; reglas: any[]; total: number; pages: number }> {
+    return this.http.get<any>(`${this.API}/admin/reglas?page=${page}&limit=${limit}`);
+  }
+
+  crearRegla(data: { titulo: string; pregunta: string; respuesta: string; fuente?: string }): Observable<any> {
+    return this.http.post<any>(`${this.API}/admin/reglas`, data);
+  }
+
+  actualizarRegla(id: string, data: { titulo?: string; pregunta?: string; respuesta?: string; activa?: boolean }): Observable<any> {
+    return this.http.put<any>(`${this.API}/admin/reglas/${id}`, data);
+  }
+
+  eliminarRegla(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.API}/admin/reglas/${id}`);
+  }
+
+  // ── Health ─────────────────────────────────────────────────────────────────
   getHealth(): Observable<any> {
     return this.http.get<any>(`${this.API}/admin/health`);
   }

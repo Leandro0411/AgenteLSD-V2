@@ -1,8 +1,9 @@
 // src/routes/chat.js — Chat contextual con Gemini (equivalente a POST /chat de Flask)
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { verificarToken } = require('../middleware/auth');
-const HistorialAnalisis  = require('../models/HistorialAnalisis');
+const { verificarToken }  = require('../middleware/auth');
+const HistorialAnalisis   = require('../models/HistorialAnalisis');
+const ReglaNormativa      = require('../models/ReglaNormativa');
 
 const router = express.Router();
 
@@ -35,6 +36,38 @@ router.post('/', verificarToken, async (req, res) => {
     informe: informeContexto,
     validacion_deterministica: validacionDeterministica,
   };
+
+  // ── Buscar reglas de conocimiento relevantes (RAG liviano) ─────────────────
+  let seccionConocimiento = '';
+  try {
+    const ultimoMensajeUsuario = messages.filter(m => m.role === 'user').at(-1)?.content || '';
+    if (ultimoMensajeUsuario.trim().length > 3) {
+      // Búsqueda full-text de MongoDB con las palabras del mensaje
+      const reglasRelevantes = await ReglaNormativa.find(
+        { $text: { $search: ultimoMensajeUsuario }, activa: true },
+        { score: { $meta: 'textScore' }, titulo: 1, pregunta: 1, respuesta: 1 }
+      )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(6)
+        .lean();
+
+      if (reglasRelevantes.length > 0) {
+        seccionConocimiento = `
+═══════════════════════════════════════════════════════════════
+CONOCIMIENTO ADICIONAL RELEVANTE (Base de conocimiento curada)
+═══════════════════════════════════════════════════════════════
+Las siguientes reglas fueron extraídas de normativas y pueden ser relevantes para esta consulta:
+
+${reglasRelevantes.map((r, i) =>
+  `[Regla ${i + 1}] ${r.titulo}\nPregunta: ${r.pregunta}\nRespuesta: ${r.respuesta}`
+).join('\n\n')}
+`;
+      }
+    }
+  } catch (e) {
+    // Si falla la búsqueda (ej: índice no creado aún), continuar sin conocimiento extra
+    console.warn('[chat] RAG search failed, continuing without extra knowledge:', e.message);
+  }
 
   const systemPrompt = `Sos un asistente experto en Libro Sueldo Digital (LSD) de ARCA Argentina.
 SYSTEM_PROMPT = """Eres un experto en el módulo "LSD Nuevo" (Libro Sueldo Digital v2) del sistema e-SUELDOS
@@ -580,7 +613,7 @@ El usuario puede preguntar sobre:
 
 No inventes datos del TXT. Si falta contexto, decilo y pedí que primero cargue o analice un archivo.
 Para preguntas técnicas podés mencionar REG01/REG02/REG03/REG04/REG05, posiciones y campos.
-
+${seccionConocimiento}
 Contexto de sesión actual:
 ${JSON.stringify(contexto, null, 2)}`;
 

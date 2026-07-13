@@ -7,9 +7,10 @@
 
   <!-- Tabs -->
   <div class="admin-tabs">
-    <button [class.active]="tabActiva === 'usuarios'"   (click)="cambiarTab('usuarios')"   id="admin-tab-usuarios">👥 Usuarios</button>
-    <button [class.active]="tabActiva === 'tickets'"    (click)="cambiarTab('tickets')"    id="admin-tab-tickets">🎫 Feedback</button>
-    <button [class.active]="tabActiva === 'normativas'" (click)="cambiarTab('normativas')" id="admin-tab-normativas">📚 Normativas</button>
+    <button [class.active]="tabActiva === 'usuarios'"    (click)="cambiarTab('usuarios')"    id="admin-tab-usuarios">👥 Usuarios</button>
+    <button [class.active]="tabActiva === 'tickets'"     (click)="cambiarTab('tickets')"     id="admin-tab-tickets">🎫 Feedback</button>
+    <button [class.active]="tabActiva === 'normativas'"  (click)="cambiarTab('normativas')"  id="admin-tab-normativas">📄 Normativas</button>
+    <button [class.active]="tabActiva === 'conocimiento'" (click)="cambiarTab('conocimiento')" id="admin-tab-conocimiento">🧠 Conocimiento</button>
   </div>
 
   <!-- ── TAB: Usuarios ────────────────────────────────────────────────────── -->
@@ -208,6 +209,117 @@
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: Conocimiento ──────────────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'conocimiento'" class="tab-panel">
+    <div class="panel-section">
+
+      <!-- Header -->
+      <div class="conocimiento-header">
+        <div>
+          <h2>🧠 Base de Conocimiento</h2>
+          <p class="conocimiento-sub">Reglas extraídas de normativas y editadas por el admin. El chat usa estas reglas automáticamente.</p>
+        </div>
+        <div class="conocimiento-actions">
+          <span class="reglas-count">{{ reglasTotal }} regla{{ reglasTotal !== 1 ? 's' : '' }}</span>
+          <button class="btn-primary" (click)="mostrarFormNuevaRegla = !mostrarFormNuevaRegla" id="btn-nueva-regla">
+            {{ mostrarFormNuevaRegla ? '✕ Cancelar' : '+ Nueva regla' }}
+          </button>
+          <button class="btn-secondary" (click)="cargarReglas(reglasPagina)" id="btn-recargar-reglas">↺ Recargar</button>
+        </div>
+      </div>
+
+      <!-- Mensaje de estado -->
+      <p *ngIf="reglaMsg" class="regla-msg" [class.ok]="reglaMsg.startsWith('✅')">{{ reglaMsg }}</p>
+
+      <!-- Form nueva regla -->
+      <div *ngIf="mostrarFormNuevaRegla" class="nueva-regla-form">
+        <h3>Nueva regla manual</h3>
+        <div class="regla-form-grid">
+          <label>Título
+            <input type="text" [(ngModel)]="nuevaRegla.titulo" placeholder="Título corto de la regla" id="nueva-regla-titulo" />
+          </label>
+          <label>Fuente
+            <input type="text" [(ngModel)]="nuevaRegla.fuente" placeholder="PDF, manual, etc." id="nueva-regla-fuente" />
+          </label>
+          <label class="full-width">Pregunta / Concepto
+            <textarea [(ngModel)]="nuevaRegla.pregunta" rows="2" id="nueva-regla-pregunta" placeholder="¿Cuándo se aplica la detracción?"></textarea>
+          </label>
+          <label class="full-width">Respuesta / Regla
+            <textarea [(ngModel)]="nuevaRegla.respuesta" rows="4" id="nueva-regla-respuesta" placeholder="Explicación detallada de la regla..."></textarea>
+          </label>
+        </div>
+        <button class="btn-primary" (click)="crearReglaManual()"
+          [disabled]="!nuevaRegla.titulo.trim() || !nuevaRegla.pregunta.trim() || !nuevaRegla.respuesta.trim()"
+          id="btn-guardar-nueva-regla">💾 Guardar regla</button>
+      </div>
+
+      <!-- Spinner -->
+      <div *ngIf="reglasCargando" class="loading-center">Cargando reglas...</div>
+
+      <!-- Lista de reglas -->
+      <div *ngIf="!reglasCargando" class="reglas-lista">
+        <div *ngFor="let regla of reglas" class="regla-card" [class.inactiva]="!regla.activa">
+
+          <!-- Modo visualización -->
+          <ng-container *ngIf="reglaEditando?._id !== regla._id">
+            <div class="regla-card-header">
+              <div class="regla-meta">
+                <span class="regla-titulo">{{ regla.titulo }}</span>
+                <span class="regla-fuente">{{ regla.fuente }}</span>
+                <span class="regla-badge" [class.activa]="regla.activa" [class.inactiva]="!regla.activa">
+                  {{ regla.activa ? '● Activa' : '○ Inactiva' }}
+                </span>
+              </div>
+              <div class="regla-btns">
+                <button class="btn-icon" title="Editar" (click)="editarRegla(regla)" [id]="'btn-edit-' + regla._id">✏️</button>
+                <button class="btn-icon" [title]="regla.activa ? 'Desactivar' : 'Activar'" (click)="toggleActiva(regla)" [id]="'btn-toggle-' + regla._id">
+                  {{ regla.activa ? '🔇' : '🔔' }}
+                </button>
+                <button class="btn-icon danger" title="Eliminar" (click)="eliminarRegla(regla)" [id]="'btn-del-' + regla._id">🗑️</button>
+              </div>
+            </div>
+            <div class="regla-qa">
+              <div class="regla-q"><strong>Q:</strong> {{ regla.pregunta }}</div>
+              <div class="regla-a"><strong>A:</strong> {{ regla.respuesta }}</div>
+            </div>
+          </ng-container>
+
+          <!-- Modo edición inline -->
+          <ng-container *ngIf="reglaEditando?._id === regla._id">
+            <div class="regla-edit-form">
+              <label>Título
+                <input type="text" [(ngModel)]="reglaEditando.titulo" [id]="'edit-titulo-' + regla._id" />
+              </label>
+              <label>Pregunta
+                <textarea [(ngModel)]="reglaEditando.pregunta" rows="2" [id]="'edit-pregunta-' + regla._id"></textarea>
+              </label>
+              <label>Respuesta
+                <textarea [(ngModel)]="reglaEditando.respuesta" rows="4" [id]="'edit-respuesta-' + regla._id"></textarea>
+              </label>
+              <div class="regla-edit-actions">
+                <button class="btn-primary" (click)="guardarEdicionRegla()" [id]="'btn-save-' + regla._id">💾 Guardar</button>
+                <button class="btn-secondary" (click)="cancelarEdicion()" [id]="'btn-cancel-' + regla._id">Cancelar</button>
+              </div>
+            </div>
+          </ng-container>
+
+        </div>
+
+        <!-- Paginación -->
+        <div class="reglas-paginacion" *ngIf="reglasPages > 1">
+          <button [disabled]="reglasPagina <= 1" (click)="cargarReglas(reglasPagina - 1)" id="btn-prev-reglas">‹ Anterior</button>
+          <span>Página {{ reglasPagina }} de {{ reglasPages }}</span>
+          <button [disabled]="reglasPagina >= reglasPages" (click)="cargarReglas(reglasPagina + 1)" id="btn-next-reglas">Siguiente ›</button>
+        </div>
+
+        <p *ngIf="!reglasCargando && reglas.length === 0" class="empty-state">
+          No hay reglas todavía. Subí un PDF de normativa o creá una regla manual.
+        </p>
+      </div>
+
     </div>
   </div>
 

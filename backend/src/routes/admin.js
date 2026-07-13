@@ -8,7 +8,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Usuario          = require('../models/Usuario');
 const HistorialAnalisis = require('../models/HistorialAnalisis');
 const { verificarToken, soloAdmin } = require('../middleware/auth');
-const NormativaQA = require('../models/NormativaQA');
+const NormativaQA      = require('../models/NormativaQA');
+const ReglaNormativa   = require('../models/ReglaNormativa');
 
 const router = express.Router();
 
@@ -161,26 +162,104 @@ router.post('/normativas', verificarToken, soloAdmin, uploadPdf.single('pdf'), a
       { text: prompt }
     ]);
 
-    // 3. Parsear el resultado y guardar en MongoDB
+    // 3. Parsear el resultado y guardar como reglas individuales en ReglaNormativa
     const conocimientoExtraido = JSON.parse(result.response.text());
-    
+
+    const reglas = conocimientoExtraido.map((qa) => ({
+      titulo:    qa.pregunta?.substring(0, 80) || 'Sin título',
+      pregunta:  qa.pregunta  || '',
+      respuesta: qa.respuesta || '',
+      fuente:    req.file.originalname,
+      subidoPor: req.usuario.username,
+      activa:    true,
+    }));
+
+    await ReglaNormativa.insertMany(reglas);
+
+    // Mantener compatibilidad: también guardar en NormativaQA (legacy)
     await NormativaQA.create({
-      archivoOriginal: req.file.originalname,
+      archivoOriginal:      req.file.originalname,
       conocimientoExtraido: conocimientoExtraido,
-      subidoPor: req.usuario.username
+      subidoPor:            req.usuario.username,
     });
 
-    // 4. (Opcional) Borrar el archivo de Gemini API porque ya sacamos el conocimiento
+    // 4. Borrar el archivo de Gemini API y del disco local
     await fetch(`https://generativelanguage.googleapis.com/v1beta/files/${fileName}?key=${apiKey}`, { method: 'DELETE' });
-    fs.unlink(req.file.path, () => {}); // Limpiar temporal local
+    fs.unlink(req.file.path, () => {});
 
     return res.json({
       ok: true,
-      mensaje: `PDF procesado. Se extrajeron ${conocimientoExtraido.length} reglas de conocimiento.`,
+      mensaje: `PDF procesado. Se extrajeron ${reglas.length} reglas de conocimiento.`,
+      total: reglas.length,
     });
   } catch (err) {
     fs.unlink(req.file.path, () => {});
     console.error('[admin] Error procesando PDF:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── REGLAS DE CONOCIMIENTO (Base de Conocimiento curada) ──────────────────────
+
+// GET /api/admin/reglas — Listar todas las reglas (paginado)
+router.get('/reglas', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const skip  = (page - 1) * limit;
+    const soloActivas = req.query.activas === 'true';
+
+    const filtro = soloActivas ? { activa: true } : {};
+    const [reglas, total] = await Promise.all([
+      ReglaNormativa.find(filtro).sort({ creadaEn: -1 }).skip(skip).limit(limit),
+      ReglaNormativa.countDocuments(filtro),
+    ]);
+    return res.json({ ok: true, reglas, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/admin/reglas — Crear regla manualmente
+router.post('/reglas', verificarToken, soloAdmin, async (req, res) => {
+  const { titulo, pregunta, respuesta, fuente } = req.body;
+  if (!titulo || !pregunta || !respuesta) {
+    return res.status(400).json({ ok: false, error: 'titulo, pregunta y respuesta son obligatorios.' });
+  }
+  try {
+    const regla = await ReglaNormativa.create({
+      titulo, pregunta, respuesta,
+      fuente:    fuente    || 'Manual',
+      subidoPor: req.usuario.username,
+    });
+    return res.status(201).json({ ok: true, regla });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// PUT /api/admin/reglas/:id — Editar regla
+router.put('/reglas/:id', verificarToken, soloAdmin, async (req, res) => {
+  const { titulo, pregunta, respuesta, activa } = req.body;
+  try {
+    const regla = await ReglaNormativa.findByIdAndUpdate(
+      req.params.id,
+      { titulo, pregunta, respuesta, activa },
+      { new: true, runValidators: true }
+    );
+    if (!regla) return res.status(404).json({ ok: false, error: 'Regla no encontrada.' });
+    return res.json({ ok: true, regla });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/admin/reglas/:id — Borrar regla
+router.delete('/reglas/:id', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    await ReglaNormativa.findByIdAndDelete(req.params.id);
+    return res.json({ ok: true, mensaje: 'Regla eliminada.' });
+  } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
 });

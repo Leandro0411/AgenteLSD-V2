@@ -2,7 +2,7 @@
 import { Component, OnInit } from '@angular/core';
 import { AdminService } from '../../core/services/admin.service';
 
-type AdminTab = 'usuarios' | 'tickets' | 'normativas' | 'historial';
+type AdminTab = 'usuarios' | 'tickets' | 'normativas' | 'historial' | 'conocimiento';
 
 @Component({
   selector: 'app-admin',
@@ -88,6 +88,18 @@ export class AdminComponent implements OnInit {
   // ── Historial ────────────────────────────────────────────────────────────────
   historial: any[]  = [];
 
+  // ── Base de Conocimiento (Reglas) ────────────────────────────────────────────
+  reglas: any[]        = [];
+  reglasCargando       = false;
+  reglasTotal          = 0;
+  reglasPagina         = 1;
+  reglasPages          = 1;
+  reglaEditando: any   = null;
+  reglaEditandoCopia: any = null;
+  mostrarFormNuevaRegla = false;
+  nuevaRegla = { titulo: '', pregunta: '', respuesta: '', fuente: 'Manual' };
+  reglaMsg   = '';
+
   constructor(private admin: AdminService) {}
 
   ngOnInit(): void {
@@ -97,9 +109,10 @@ export class AdminComponent implements OnInit {
   // ── Tabs ────────────────────────────────────────────────────────────────────
   cambiarTab(tab: AdminTab): void {
     this.tabActiva = tab;
-    if (tab === 'tickets'    && !this.tickets.length)    this.cargarTickets();
-    if (tab === 'normativas' && !this.normativas.length) this.cargarNormativas();
-    if (tab === 'historial'  && !this.historial.length)  this.cargarHistorial();
+    if (tab === 'tickets'      && !this.tickets.length)    this.cargarTickets();
+    if (tab === 'normativas'   && !this.normativas.length) this.cargarNormativas();
+    if (tab === 'historial'    && !this.historial.length)  this.cargarHistorial();
+    if (tab === 'conocimiento' && !this.reglas.length)     this.cargarReglas();
   }
 
   // ── Usuarios ────────────────────────────────────────────────────────────────
@@ -202,5 +215,82 @@ export class AdminComponent implements OnInit {
   // ── Historial ────────────────────────────────────────────────────────────────
   cargarHistorial(): void {
     this.admin.getHistorial().subscribe({ next: (r) => (this.historial = r.historial || []) });
+  }
+
+  // ── Base de Conocimiento (Reglas) ──────────────────────────────────────────
+  cargarReglas(pagina = 1): void {
+    this.reglasCargando = true;
+    this.reglaMsg = '';
+    this.admin.getReglas(pagina).subscribe({
+      next: (r) => {
+        this.reglas       = r.reglas   || [];
+        this.reglasTotal  = r.total    || 0;
+        this.reglasPagina = r.page     || 1;
+        this.reglasPages  = r.pages    || 1;
+        this.reglasCargando = false;
+      },
+      error: () => { this.reglasCargando = false; },
+    });
+  }
+
+  editarRegla(regla: any): void {
+    this.reglaEditando     = regla;
+    this.reglaEditandoCopia = { ...regla }; // backup para cancelar
+  }
+
+  cancelarEdicion(): void {
+    if (this.reglaEditando && this.reglaEditandoCopia) {
+      // Restaurar valores originales
+      Object.assign(this.reglaEditando, this.reglaEditandoCopia);
+    }
+    this.reglaEditando     = null;
+    this.reglaEditandoCopia = null;
+  }
+
+  guardarEdicionRegla(): void {
+    if (!this.reglaEditando) return;
+    this.admin.actualizarRegla(this.reglaEditando._id, {
+      titulo:    this.reglaEditando.titulo,
+      pregunta:  this.reglaEditando.pregunta,
+      respuesta: this.reglaEditando.respuesta,
+    }).subscribe({
+      next: () => {
+        this.reglaMsg = '✅ Regla guardada.';
+        this.reglaEditando     = null;
+        this.reglaEditandoCopia = null;
+        setTimeout(() => this.reglaMsg = '', 3000);
+      },
+      error: (err) => { this.reglaMsg = '❌ ' + (err.error?.error || 'Error guardando.'); },
+    });
+  }
+
+  toggleActiva(regla: any): void {
+    this.admin.actualizarRegla(regla._id, { activa: !regla.activa }).subscribe({
+      next: (r) => { regla.activa = r.regla.activa; },
+    });
+  }
+
+  eliminarRegla(regla: any): void {
+    if (!confirm(`¿Eliminar la regla "${regla.titulo}"? Esta acción no se puede deshacer.`)) return;
+    this.admin.eliminarRegla(regla._id).subscribe({
+      next: () => { this.reglas = this.reglas.filter(r => r._id !== regla._id); this.reglasTotal--; },
+      error: (err) => { this.reglaMsg = '❌ ' + (err.error?.error || 'Error eliminando.'); },
+    });
+  }
+
+  crearReglaManual(): void {
+    const { titulo, pregunta, respuesta } = this.nuevaRegla;
+    if (!titulo.trim() || !pregunta.trim() || !respuesta.trim()) return;
+    this.admin.crearRegla(this.nuevaRegla).subscribe({
+      next: (r) => {
+        this.reglas.unshift(r.regla);
+        this.reglasTotal++;
+        this.nuevaRegla = { titulo: '', pregunta: '', respuesta: '', fuente: 'Manual' };
+        this.mostrarFormNuevaRegla = false;
+        this.reglaMsg = '✅ Regla creada.';
+        setTimeout(() => this.reglaMsg = '', 3000);
+      },
+      error: (err) => { this.reglaMsg = '❌ ' + (err.error?.error || 'Error creando.'); },
+    });
   }
 }
