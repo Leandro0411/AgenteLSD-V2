@@ -1,0 +1,52 @@
+# ─── DEPENDENCIAS (Node.js & Angular) ───
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ─── ANGULAR (Builds y Caché) ───
+dist/
+.angular/
+tmp/
+out-tsc/
+
+# ─── PYTHON (Agente LSD) ───
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.Python
+
+# ─── VARIABLES DE ENTORNO Y SECRETOS (¡Crítico!) ───
+.env
+.env.*
+*.local
+
+# ─── ARCHIVOS SUBIDOS Y TEMPORALES ───
+# Ignoramos la carpeta donde se guardan los PDFs temporales y los TXTs de prueba
+backend/uploads/
+Txts/
+*.pdf
+*.txt
+*.csv
+
+# Ignoramos el JSON local donde guardás las referencias de Gemini (opcional)
+python_service/gemini_files.json
+
+# ─── IDEs Y EDITORES DE CÓDIGO ───
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ─── ARCHIVOS DEL SISTEMA OPERATIVO ───
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -1,0 +1,95 @@
+<!-- src/app/shared/components/layout/layout.component.html -->
+<div class="app-shell" [class.menu-open]="menuAbierto">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="assets/logo-esueldos.png"
+           alt="e-Sueldos"
+           style="width:100%; height:auto; object-fit:contain; display:block;">
+      <button class="sidebar-close" (click)="toggleMenu()" id="btn-close-sidebar">✕</button>
+    </div>
+
+    <ul class="sidebar-menu">
+      <li>
+        <a routerLink="/analizar" routerLinkActive="active" id="nav-analizar" (click)="menuAbierto = false">
+          <span class="nav-icon">📄</span> Validar Archivo
+        </a>
+      </li>
+      <li>
+        <a routerLink="/historial" routerLinkActive="active" id="nav-historial" (click)="menuAbierto = false">
+          <span class="nav-icon">📂</span> Mi Historial
+        </a>
+      </li>
+      <li>
+        <a routerLink="/top-errores" routerLinkActive="active" id="nav-top-errores" (click)="menuAbierto = false">
+          <span class="nav-icon">10</span> Errores Frecuentes
+        </a>
+      </li>
+      <li *ngIf="auth.esAdmin">
+        <a routerLink="/admin" routerLinkActive="active" id="nav-admin" (click)="menuAbierto = false">
+          <span class="nav-icon">⚙️</span> Administración
+        </a>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ (auth.usuario?.username || 'U')[0].toUpperCase() }}</div>
+        <div>
+          <p class="user-name">{{ auth.usuario?.username }}</p>
+          <p class="user-rol">{{ auth.usuario?.rol }}</p>
+        </div>
+      </div>
+      <button class="btn-logout" (click)="logout()" id="btn-logout">→ Cerrar sesión</button>
+    </div>
+  </nav>
+
+  <!-- Overlay mobile -->
+  <div class="overlay" (click)="menuAbierto = false" [class.visible]="menuAbierto"></div>
+
+  <!-- Contenido principal -->
+  <div class="main-content">
+    <header class="topbar">
+      <button class="btn-hamburger" (click)="toggleMenu()" id="btn-open-sidebar">☰</button>
+      <span class="topbar-title"> Agente Libro de Sueldo Digital</span>
+    </header>
+
+    <main class="page-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+  <div class="global-chat-container">
+    <div class="chat-panel" [class.open]="chatAbierto">
+      <div class="chat-header">
+        <span>🤖 Asistente LSD</span>
+        <button (click)="chatAbierto = false" id="btn-close-global-chat">✕</button>
+      </div>
+      
+      <div class="chat-body" id="global-chat-body">
+        <div *ngFor="let m of mensajesGlobales" class="chat-bubble" [ngClass]="m.role">
+          {{ m.content }}
+        </div>
+        <div *ngIf="cargandoGlobal" class="chat-bubble assistant typing">
+          <div class="lsd-spinner-small"></div> Escribiendo...
+        </div>
+      </div>
+      
+      <div class="chat-input-area">
+        <input 
+          type="text" 
+          [(ngModel)]="mensajeGlobal" 
+          (keyup.enter)="enviarMensajeGlobal()" 
+          placeholder="Consultá normativas o reglas..." 
+        />
+        <button (click)="enviarMensajeGlobal()" [disabled]="cargandoGlobal || !mensajeGlobal.trim()">
+          Enviar
+        </button>
+      </div>
+    </div>
+
+    <button class="fab-btn" (click)="chatAbierto = !chatAbierto" [class.active]="chatAbierto">
+      💬
+    </button>
+  </div>
+</div>

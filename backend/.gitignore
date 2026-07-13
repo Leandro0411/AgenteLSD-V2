@@ -1,0 +1,5 @@
+node_modules/
+uploads/tmp/*.txt
+uploads/tmp/*.pdf
+.env
+*.log

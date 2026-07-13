@@ -1,0 +1,162 @@
+.analytics-page {
+  padding: 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  h1 { font-size: 24px; color: #1E293B; margin: 0 0 8px; }
+  p { color: #64748B; margin: 0; }
+}
+
+/* ── ESTRUCTURA DEL DASHBOARD (La clase que faltaba) ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* En pantallas grandes (PC), ponemos la dona a la izquierda y la lista a la derecha */
+@media (min-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 350px 1fr;
+  }
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
+  margin-bottom: 24px;
+  padding: 24px;
+  
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    h3 { margin: 0; font-size: 16px; color: #1E293B; }
+  }
+}
+
+/* ── EL GRÁFICO DE DONA (CSS PURO) ── */
+.donut-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.donut-chart {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  /* La máscara hace el hueco en el medio para que sea dona y no pastel */
+  mask: radial-gradient(circle, transparent 55%, black 56%);
+  -webkit-mask: radial-gradient(circle, transparent 55%, black 56%);
+  transition: background 0.5s ease;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    
+    .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+    .legend-text {
+      display: flex;
+      flex-direction: column;
+      .lbl { font-size: 13px; color: #64748B; }
+      .pct { font-size: 16px; font-weight: 700; color: #1E293B; }
+    }
+  }
+}
+
+/* ── LISTA RANKING TOP 10 ── */
+.top10-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error-item {
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+
+  &.expanded {
+    border-color: #3B82F6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  }
+
+  .error-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    cursor: pointer;
+    background: white;
+    
+    &:hover { background: #F8FAFC; }
+
+    .rank {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F1F5F9;
+      color: #475569;
+      font-weight: 700;
+      border-radius: 50%;
+      margin-right: 16px;
+    }
+
+    .title-container h4 {
+      margin: 0;
+      font-size: 14px;
+      color: #1E293B;
+    }
+
+    .stats {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .freq-badge {
+        background: #FEE2E2;
+        color: #991B1B;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .chevron { color: #94A3B8; font-size: 12px; }
+    }
+  }
+
+  .error-body {
+    padding: 16px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    font-size: 14px;
+    color: #475569;
+
+    p { margin: 0 0 12px; line-height: 1.5; }
+    .impact-text { color: #3B82F6; font-weight: 600; margin-bottom: 0; }
+  }
+}

@@ -1,0 +1,424 @@
+<!-- src/app/features/analizar/analizar.component.html -->
+
+<!-- ── ESTADO: idle / upload ─────────────────────────────────────────────── -->
+<div *ngIf="estado === 'idle' || estado === 'uploading'" class="upload-page">
+  <div class="upload-hero">
+    <h1>Validar Archivo LSD</h1>
+    <p class="upload-desc">Arrastrá el archivo .txt de Libro Sueldo Digital o hacé clic para seleccionarlo.</p>
+  </div>
+
+  <div
+    class="dropzone"
+    [class.dragover]="dragOver"
+    [class.selected]="archivoSeleccionado"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()"
+    id="dropzone"
+  >
+    <input #fileInput type="file" accept=".txt" hidden (change)="onFileInput($event)" id="file-input" />
+    <div *ngIf="!archivoSeleccionado" class="dropzone-placeholder">
+      <span class="drop-icon">📂</span>
+      <p>Soltá el archivo acá o <strong>hacé clic</strong></p>
+      <small>Solo archivos .txt · Máximo 50 MB</small>
+    </div>
+    <div *ngIf="archivoSeleccionado" class="dropzone-selected">
+      <span class="drop-icon">✅</span>
+      <p><strong>{{ archivoSeleccionado.name }}</strong></p>
+      <small>{{ (archivoSeleccionado.size / 1024 / 1024).toFixed(2) }} MB · Listo para analizar</small>
+    </div>
+  </div>
+  
+  <div class="error-banner" *ngIf="errorMsg">⚠️ {{ errorMsg }}</div>
+
+  <button
+    id="btn-analizar"
+    class="btn-primary btn-lg"
+    [disabled]="!archivoSeleccionado || estado === 'uploading'"
+    (click)="iniciarAnalisis()"
+  >
+    <span *ngIf="estado === 'idle'">🚀 Iniciar Análisis</span>
+    <span *ngIf="estado === 'uploading'">⏳ Subiendo archivo...</span>
+  </button>
+</div>
+
+<!-- ── ESTADO: streaming ─────────────────────────────────────────────────── -->
+<div *ngIf="estado === 'streaming'" class="progress-page">
+  <div class="progress-header">
+    <h2>Analizando: <strong>{{ nombreArchivo }}</strong></h2>
+    <p class="progress-subtitle">{{ pasoActual }}</p>
+  </div>
+
+  <div class="spinner-container">
+    <div class="lsd-spinner"></div>
+  </div>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar" [style.width.%]="progreso"></div>
+    <span class="progress-pct">{{ progreso }}%</span>
+  </div>
+
+  <ul class="steps-list">
+    <li *ngFor="let paso of pasos" [class.completado]="paso.completado">
+      <span class="step-check">{{ paso.completado ? '✅' : '⏳' }}</span>
+      {{ paso.label }}
+    </li>
+  </ul>
+</div>
+
+<!-- ── ESTADO: error ─────────────────────────────────────────────────────── -->
+<div *ngIf="estado === 'error'" class="error-page">
+  <div class="error-card">
+    <span class="error-icon">❌</span>
+    <h2>Ocurrió un error</h2>
+    <p>{{ errorMsg }}</p>
+    <button class="btn-primary" (click)="reiniciar()" id="btn-reiniciar-error">Intentar de nuevo</button>
+  </div>
+</div>
+
+<!-- ── ESTADO: completado ─────────────────────────────────────────────────── -->
+<div *ngIf="estado === 'completado' && informe" class="result-page">
+
+  <!-- Veredicto banner -->
+  <div class="veredicto-banner" [ngClass]="{
+    'verde':    informe.veredicto === 'PRESENTABLE',
+    'amarillo': informe.veredicto === 'REVISAR',
+    'rojo':     informe.veredicto === 'SERÁ RECHAZADO'
+  }" id="veredicto-banner">
+    <span class="veredicto-emoji">
+      {{ informe.veredicto === 'PRESENTABLE' ? '✅' : informe.veredicto === 'REVISAR' ? '⚠️' : '❌' }}
+    </span>
+    <div>
+      <h2 class="veredicto-titulo">{{ informe.veredicto }}</h2>
+      <p class="veredicto-razon">{{ informe.veredicto_razon }}</p>
+    </div>
+    <button class="btn-reiniciar" (click)="reiniciar()" id="btn-nuevo-analisis">+ Nuevo análisis</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-num">{{ informe.estadisticas?.total_empleados }}</span><span class="stat-label">Empleados</span></div>
+    <div class="stat-card"><span class="stat-num">{{ informe.estadisticas?.total_conceptos }}</span><span class="stat-label">Conceptos</span></div>
+    <div class="stat-card critico"><span class="stat-num">{{ informe.estadisticas?.errores_criticos }}</span><span class="stat-label">Errores críticos</span></div>
+    <div class="stat-card advertencia"><span class="stat-num">{{ informe.estadisticas?.advertencias }}</span><span class="stat-label">Advertencias</span></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="tabActiva === 'resumen'"   (click)="tabActiva = 'resumen'"   id="tab-resumen">📋 Resumen</button>
+    <button [class.active]="tabActiva === 'problemas'" (click)="tabActiva = 'problemas'" id="tab-problemas">
+      🔍 Problemas ({{ informe.problemas?.length || 0 }})
+    </button>
+  </div>
+
+  <!-- Tab: Resumen -->
+  <div *ngIf="tabActiva === 'resumen'" class="tab-content">
+    <div class="resumen-card">
+      <p>{{ informe.resumen }}</p>
+    </div>
+    <div *ngIf="informe.errores_arca?.presente" class="arca-card">
+      <h3>Errores ARCA detectados</h3>
+      <p>{{ informe.errores_arca.resumen }}</p>
+    </div>
+
+    <!-- ── DASHBOARD DE MÉTRICAS ────────────────────────────────────────── -->
+    <div class="dashboard-metricas" *ngIf="informe.estadisticas">
+
+      <!-- Fila 1: Dona de distribución de empleados -->
+      <div class="dash-section donut-section">
+        <h3 class="dash-title">👥 Distribución de empleados</h3>
+
+        <div class="donut-layout">
+          <!-- Dona -->
+          <div class="donut-wrap">
+            <div class="donut-ring" [style.background]="donutGradient"></div>
+            <div class="donut-center">
+              <span class="donut-center-num">{{ informe.estadisticas.total_empleados }}</span>
+              <span class="donut-center-lbl">empleados</span>
+            </div>
+          </div>
+
+
+          <!-- Leyenda -->
+          <div class="donut-legend">
+            <div class="legend-item">
+              <span class="legend-dot ok"></span>
+              <div class="legend-text">
+                <span class="legend-label">Sin errores</span>
+                <span class="legend-pct">{{ informe.estadisticas.total_empleados > 0
+                  ? ((informe.estadisticas.empleados_validados / informe.estadisticas.total_empleados) * 100 | number:'1.1-1')
+                  : 0 }}%</span>
+                <span class="legend-n">{{ informe.estadisticas.empleados_validados ?? 0 }}</span>
+              </div>
+            </div>
+            <div class="legend-item" *ngIf="(informe.estadisticas.empleados_afectados_advertencia ?? 0) > 0">
+              <span class="legend-dot adv"></span>
+              <div class="legend-text">
+                <span class="legend-label">Con advertencia</span>
+                <span class="legend-pct">{{ informe.estadisticas.total_empleados > 0
+                  ? ((informe.estadisticas.empleados_afectados_advertencia / informe.estadisticas.total_empleados) * 100 | number:'1.1-1')
+                  : 0 }}%</span>
+                <span class="legend-n">{{ informe.estadisticas.empleados_afectados_advertencia ?? 0 }}</span>
+              </div>
+            </div>
+            <div class="legend-item" *ngIf="(informe.estadisticas.empleados_afectados_critico ?? 0) > 0">
+              <span class="legend-dot crit"></span>
+              <div class="legend-text">
+                <span class="legend-label">Con error crítico</span>
+                <span class="legend-pct">{{ informe.estadisticas.total_empleados > 0
+                  ? ((informe.estadisticas.empleados_afectados_critico / informe.estadisticas.total_empleados) * 100 | number:'1.1-1')
+                  : 0 }}%</span>
+                <span class="legend-n">{{ informe.estadisticas.empleados_afectados_critico ?? 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Fila 2: Errores por tipo (barras horizontales) -->
+      <div class="dash-section" *ngIf="informe.problemas?.length > 0">
+        <h3 class="dash-title">📉 Errores por tipo de regla</h3>
+        <div class="errores-por-tipo">
+          <div *ngFor="let p of informe.problemas" class="tipo-row">
+            <span class="tipo-badge" [ngClass]="p.severidad?.toLowerCase()">{{ p.severidad }}</span>
+            <span class="tipo-titulo">{{ p.titulo }}</span>
+            <div class="tipo-bar-track">
+              <div class="tipo-bar"
+                [ngClass]="p.severidad?.toLowerCase()"
+                [style.width.%]="informe.estadisticas.total_empleados > 0
+                  ? ((p.cuils_afectados / informe.estadisticas.total_empleados) * 100)
+                  : 100">
+              </div>
+            </div>
+            <span class="tipo-cuils">{{ p.cuils_afectados }} CUIL{{ p.cuils_afectados !== 1 ? 's' : '' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fila 3: Registros del archivo -->
+      <div class="dash-section">
+        <h3 class="dash-title">📄 Registros del archivo</h3>
+        <div class="reg-chips">
+          <div class="reg-chip" *ngFor="let tipo of ['01','02','03','04','05']">
+            <span class="reg-chip-type">REG{{ tipo }}</span>
+            <span class="reg-chip-count">
+              {{ informe.validacion_deterministica?.registros_por_tipo?.[tipo] ?? 0 }}
+            </span>
+            <span class="reg-chip-label">{{
+              tipo === '01' ? 'Cabecera' :
+              tipo === '02' ? 'Empleados' :
+              tipo === '03' ? 'Conceptos' :
+              tipo === '04' ? 'Bases' : 'Eventuales'
+            }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- ── FIN DASHBOARD ────────────────────────────────────────────────── -->
+
+  </div>
+
+
+  <!-- Tab: Problemas -->
+  <div *ngIf="tabActiva === 'problemas'" class="tab-content">
+    <div *ngIf="informe.problemas?.length === 0" class="no-problemas">
+      🎉 No se detectaron problemas.
+    </div>
+
+    <div *ngFor="let p of informe.problemas" class="problema-card" [ngClass]="p.severidad?.toLowerCase()" id="problema-{{ p.id }}">
+      <div class="problema-header" (click)="toggleProblema(p.id)">
+        <div class="problema-titulo-row">
+          <span class="badge" [ngClass]="p.severidad?.toLowerCase()">{{ p.severidad }}</span>
+          <h3>{{ p.titulo }}</h3>
+        </div>
+        <div class="problema-meta">
+          <span>👥 {{ p.cuils_afectados }} empleado(s)</span>
+          <span class="expand-icon">{{ problemaExpandido === p.id ? '▲' : '▼' }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="problemaExpandido === p.id" class="problema-body">
+        <p class="problema-causa"><strong>Causa:</strong> {{ p.causa }}</p>
+        <p class="problema-solucion"><strong>Solución:</strong> {{ p.solucion }}</p>
+
+        <div *ngIf="p.tutorial_pasos?.length" class="tutorial">
+          <h4>📖 Pasos para corregir en e-Sueldos</h4>
+          <ol class="steps">
+            <li *ngFor="let paso of p.tutorial_pasos" class="step-item">
+              <div class="step-titulo">{{ paso.titulo }}</div>
+              <div class="step-instruccion">{{ paso.instruccion }}</div>
+              <div *ngIf="paso.referencia" class="step-ref">📌 {{ paso.referencia }}</div>
+            </li>
+          </ol>
+        </div>
+
+        <div *ngIf="p.videoUrl" class="video-tutorial" style="margin-top: 16px;">
+          <h4>🎥 Video Explicativo</h4>
+          <a [href]="p.videoUrl" target="_blank" class="btn-secondary" style="display: inline-block; text-decoration: none;">
+            ▶️ Ver solución guiada
+          </a>
+        </div>
+
+        <button *ngIf="auth.esAdmin" class="btn-edit-regla" (click)="abrirEditor(p)" [id]="'btn-edit-' + p.id">
+          ✏️ Editar
+        </button>
+      </div>
+      <div class="afectados-section">
+        <button class="btn-toggle-tabla" (click)="p.mostrarTabla = !p.mostrarTabla" [id]="'btn-tabla-' + p.id">
+          <span class="icon">👥</span>
+          {{ p.mostrarTabla ? 'Ocultar' : 'Ver' }} empleados afectados ({{ p.cuils_afectados }})
+        </button>
+
+        <div class="tabla-afectados-container" *ngIf="p.mostrarTabla && p.filas_tabla?.length">
+          <div class="tabla-scroll">
+            <table class="tabla-afectados">
+              <thead>
+                <tr>
+                  <th *ngFor="let col of p.columnas_tabla" [class.col-money]="col.includes('$')" [class.col-num]="col === 'Línea' || col === 'Cantidad REG04'">
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let fila of p.filas_tabla; let i = index" [class.fila-par]="i % 2 === 0">
+                  <td *ngFor="let col of p.columnas_tabla"
+                      [class.cell-money]="col.includes('$')"
+                      [class.cell-neg]="col.includes('Diferencia') && fila[col] && fila[col] !== '—'"
+                      [class.cell-num]="col === 'Línea' || col === 'Cantidad REG04'"
+                      [class.cell-cuil]="col === 'CUIL'">
+                    <ng-container *ngIf="col === 'CUIL'; else normalCell">
+                      <span class="cuil-badge">{{ fila[col] }}</span>
+                    </ng-container>
+                    <ng-template #normalCell>{{ fila[col] }}</ng-template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tabla-footer">
+            <span>{{ p.filas_tabla.length }} registro(s) · {{ p.cuils_afectados }} CUIL(s) afectado(s)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acciones-post-analisis" *ngIf="estado === 'completado' && !auth.esAdmin">
+    
+    <div *ngIf="!ratingEnviado" class="caja-accion caja-rating">
+      <h3>¿Qué te pareció este análisis?</h3>
+      <div class="stars-container" (mouseleave)="hoverEstrellasRating = 0">
+        <span class="star" 
+              [class.activa]="estrellasRating >= 1" 
+              [class.hovered]="hoverEstrellasRating >= 1" 
+              (mouseenter)="hoverEstrellasRating = 1" 
+              (click)="estrellasRating = 1">★</span>
+              
+        <span class="star" 
+              [class.activa]="estrellasRating >= 2" 
+              [class.hovered]="hoverEstrellasRating >= 2" 
+              (mouseenter)="hoverEstrellasRating = 2" 
+              (click)="estrellasRating = 2">★</span>
+              
+        <span class="star" 
+              [class.activa]="estrellasRating >= 3" 
+              [class.hovered]="hoverEstrellasRating >= 3" 
+              (mouseenter)="hoverEstrellasRating = 3" 
+              (click)="estrellasRating = 3">★</span>
+              
+        <span class="star" 
+              [class.activa]="estrellasRating >= 4" 
+              [class.hovered]="hoverEstrellasRating >= 4" 
+              (mouseenter)="hoverEstrellasRating = 4" 
+              (click)="estrellasRating = 4">★</span>
+              
+        <span class="star" 
+              [class.activa]="estrellasRating >= 5" 
+              [class.hovered]="hoverEstrellasRating >= 5" 
+              (mouseenter)="hoverEstrellasRating = 5" 
+              (click)="estrellasRating = 5">★</span>
+      </div>
+      <textarea 
+        [(ngModel)]="comentarioRating" 
+        placeholder="Dejanos un comentario opcional..." rows="2"></textarea>
+      <button class="btn-primary" (click)="enviarRating()" [disabled]="!estrellasRating || ratingEnviando">
+        {{ ratingEnviando ? 'Enviando...' : 'Calificar' }}
+      </button>
+    </div>
+    <div *ngIf="ratingEnviado" class="exito-msg">✅ ¡Gracias por tu calificación!</div>
+
+    <div *ngIf="!ticketEnviado" class="caja-accion caja-ticket">
+      <h3>¿Necesitás ayuda de un consultor?</h3>
+      <p>Si el Agente no detectó tu error o tenés dudas con este archivo, abrí un ticket.</p>
+      
+      <button *ngIf="!mostrarFormTicket" class="btn-secondary" (click)="mostrarFormTicket = true">
+        Abrir Ticket de Soporte
+      </button>
+
+      <div *ngIf="mostrarFormTicket" class="ticket-form">
+        <textarea 
+          [(ngModel)]="mensajeTicket" 
+          placeholder="Describí tu problema detalladamente. El consultor podrá ver el archivo que validaste..." 
+          rows="4"></textarea>
+        
+        <div class="ticket-actions">
+          <button class="btn-cancel" (click)="mostrarFormTicket = false">Cancelar</button>
+          <button class="btn-primary" (click)="enviarTicketSoporte()" [disabled]="!mensajeTicket.trim() || ticketEnviando">
+            {{ ticketEnviando ? 'Enviando...' : 'Enviar Ticket' }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="ticketEnviado" class="exito-msg">✅ Ticket abierto. Un consultor te contactará a la brevedad.</div>
+
+  </div>
+
+  <div *ngIf="tabActiva === 'chat'" class="tab-content chat-tab">
+
+  <!-- Tab: Chat -->
+  <div *ngIf="tabActiva === 'chat'" class="tab-content chat-tab">
+    <div class="chat-messages" id="chat-messages">
+      <div *ngFor="let m of mensajesChat" class="chat-bubble" [ngClass]="m.role">
+        <div class="bubble-content">{{ m.content }}</div>
+      </div>
+      <div *ngIf="chatCargando" class="chat-bubble assistant typing">
+        <div class="bubble-content">Escribiendo...</div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input
+        id="chat-input"
+        type="text"
+        [(ngModel)]="mensajeChat"
+        placeholder="Preguntá sobre este informe..."
+        (keyup.enter)="enviarChat()"
+      />
+      <button id="btn-chat-send" class="btn-primary" (click)="enviarChat()" [disabled]="chatCargando">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Wiki Editor ────────────────────────────────────────────────── -->
+<div *ngIf="editorAbierto" class="modal-overlay" id="modal-wiki">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>✏️ Editar Regla: {{ reglaEditando?.id }}</h3>
+      <button (click)="cerrarEditor()" id="btn-close-modal">✕</button>
+    </div>
+    <div class="modal-body" *ngIf="reglaEditando">
+      <label>Causa</label>
+      <textarea [(ngModel)]="reglaEditando.causa" rows="3" id="editor-causa"></textarea>
+      <label>Solución</label>
+      <textarea [(ngModel)]="reglaEditando.solucion" rows="3" id="editor-solucion"></textarea>
+      <label>URL de Video (Loom, YouTube, etc.)</label>
+      <input type="text" [(ngModel)]="reglaEditando.videoUrl" placeholder="Ej: https://www.loom.com/share/..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #CBD5E1;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="cerrarEditor()" id="btn-cancel-modal">Cancelar</button>
+      <button class="btn-primary" (click)="guardarRegla()" id="btn-save-regla">💾 Guardar</button>
+    </div>
+  </div>
+</div>

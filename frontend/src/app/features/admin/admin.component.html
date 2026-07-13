@@ -1,0 +1,179 @@
+<!-- src/app/features/admin/admin.component.html -->
+<div class="admin-page">
+  <div class="admin-header">
+    <h1>⚙️ Administración</h1>
+    <p>Gestión de usuarios, tickets, normativas e historial</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="admin-tabs">
+    <button [class.active]="tabActiva === 'usuarios'"   (click)="cambiarTab('usuarios')"   id="admin-tab-usuarios">👥 Usuarios</button>
+    <button [class.active]="tabActiva === 'tickets'"    (click)="cambiarTab('tickets')"    id="admin-tab-tickets">🎫 Feedback</button>
+    <button [class.active]="tabActiva === 'normativas'" (click)="cambiarTab('normativas')" id="admin-tab-normativas">📚 Normativas</button>
+  </div>
+
+  <!-- ── TAB: Usuarios ────────────────────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'usuarios'" class="tab-panel">
+    <div class="panel-section">
+      <h2>Crear usuario</h2>
+      <div class="form-row">
+        <input id="new-username" type="text" [(ngModel)]="nuevoUsuario.username" placeholder="Usuario" />
+        <input id="new-password" type="password" [(ngModel)]="nuevoUsuario.password" placeholder="Contraseña" />
+        <select id="new-rol" [(ngModel)]="nuevoUsuario.rol">
+          <option value="usuario">usuario</option>
+          <option value="admin">admin</option>
+        </select>
+        <button id="btn-crear-usuario" class="btn-primary" (click)="crearUsuario()" [disabled]="usuarioCargando">
+          {{ usuarioCargando ? 'Creando...' : 'Crear' }}
+        </button>
+      </div>
+      <p class="msg-ok"  *ngIf="usuarioOk">✅ {{ usuarioOk }}</p>
+      <p class="msg-err" *ngIf="usuarioError">❌ {{ usuarioError }}</p>
+    </div>
+
+    <div class="panel-section">
+      <h2>Usuarios registrados</h2>
+      <table class="admin-table" id="tabla-usuarios">
+        <thead>
+          <tr><th>Usuario</th><th>Rol</th><th>Creado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of usuarios">
+            <td>{{ u.username }}</td>
+            <td><span class="badge" [ngClass]="u.rol">{{ u.rol }}</span></td>
+            <td>{{ u.creadoEn | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>
+              <button class="btn-danger-sm" (click)="eliminarUsuario(u.username)" [id]="'btn-del-' + u.username">
+                🗑️ Eliminar
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB: Tickets ─────────────────────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'tickets'" class="tab-panel">
+    
+    <div class="panel-header-row">
+      <h2>Gestión de Feedback y Soporte</h2>
+      <div class="sub-tabs">
+        <button [class.active]="subTabTickets === 'soporte'" (click)="subTabTickets = 'soporte'">
+          🛠️ Tickets de Soporte ({{ ticketsDeSoporte.length }})
+        </button>
+        <button [class.active]="subTabTickets === 'ratings'" (click)="subTabTickets = 'ratings'">
+          ⭐ Calificaciones ({{ ticketsDeRating.length }})
+        </button>
+      </div>
+    </div>
+
+    <p *ngIf="ticketsCargando" class="loading-msg">⏳ Cargando información...</p>
+
+    <div *ngIf="!ticketsCargando && subTabTickets === 'soporte'" class="tickets-container">
+      <div *ngIf="ticketsDeSoporte.length === 0" class="empty-state">No hay tickets de soporte registrados.</div>
+      
+      <div *ngFor="let t of ticketsDeSoporte" class="ticket-card" [ngClass]="t.estado" [id]="'ticket-' + t.ticketId">
+        <div class="ticket-header">
+          <span class="ticket-user">👤 {{ t.username }}</span>
+          <span class="ticket-fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>
+          <span class="badge" [ngClass]="t.estado">{{ t.estado }}</span>
+        </div>
+        <p class="ticket-archivo">📄 Archivo: <strong>{{ t.archivo }}</strong></p>
+        <div class="ticket-cuerpo">
+          <p class="ticket-mensaje">"{{ t.mensaje }}"</p>
+        </div>
+        <div class="ticket-footer" *ngIf="t.estado === 'abierto'">
+          <button class="btn-secondary-sm" (click)="cerrarTicket(t.ticketId)">✔️ Marcar resuelto</button>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="!ticketsCargando && subTabTickets === 'ratings'" class="tickets-container">
+      <div *ngIf="ticketsDeRating.length === 0" class="empty-state">No hay calificaciones recibidas.</div>
+      
+      <div *ngFor="let t of ticketsDeRating" class="ticket-card rating-card" [id]="'rating-' + t.ticketId">
+        <div class="ticket-header">
+          <span class="ticket-user">👤 {{ t.username }}</span>
+          <span class="ticket-fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <p class="ticket-archivo">📄 Archivo validado: {{ t.archivo }}</p>
+        
+        <div class="rating-body">
+          <div class="ticket-stars">
+            <span class="star activa" *ngFor="let s of [].constructor(t.estrellas)">★</span>
+            <span class="star inactiva" *ngFor="let s of [].constructor(5 - t.estrellas)">★</span>
+          </div>
+          <p *ngIf="t.mensaje" class="rating-comentario">💬 "{{ t.mensaje }}"</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── TAB: Normativas ──────────────────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'normativas'" class="tab-panel">
+    <div class="panel-section">
+      <div class="panel-section">
+      <h2>Subir y Destilar PDF</h2>
+      <p class="subtitle">Arrastrá el PDF con normativas. La IA lo va a leer y extraerá las reglas.</p>
+      
+      <div
+        class="dropzone-admin"
+        [class.dragover]="dragOverNormativa"
+        [class.selected]="pdfSeleccionado"
+        (dragover)="onDragOverNormativa($event)"
+        (dragleave)="onDragLeaveNormativa()"
+        (drop)="onDropNormativa($event)"
+        (click)="pdfInput.click()"
+      >
+        <input #pdfInput id="input-pdf" type="file" accept=".pdf" hidden (change)="onPdfInput($event)" />
+        
+        <div *ngIf="!pdfSeleccionado" class="dropzone-placeholder">
+          <span class="drop-icon">📄</span>
+          <p>Soltá el PDF acá o <strong>hacé clic</strong> para seleccionarlo</p>
+        </div>
+        
+        <div *ngIf="pdfSeleccionado" class="dropzone-selected">
+          <span class="drop-icon">✅</span>
+          <p><strong>{{ pdfSeleccionado.name }}</strong></p>
+          <small>{{ (pdfSeleccionado.size / 1024 / 1024).toFixed(2) }} MB</small>
+        </div>
+      </div>
+
+      <button id="btn-subir-pdf" class="btn-primary" style="margin-top: 16px; width: 100%;" (click)="subirNormativa()" [disabled]="!pdfSeleccionado || normativaCargando">
+        {{ normativaCargando ? 'Procesando con IA (puede tardar un minuto)...' : '📤 Extraer Conocimiento' }}
+      </button>
+
+      <p class="msg-ok"  *ngIf="normativaMsg && !normativaMsg.includes('Error')">✅ {{ normativaMsg }}</p>
+      <p class="msg-err" *ngIf="normativaMsg && normativaMsg.includes('Error')">❌ {{ normativaMsg }}</p>
+    </div>
+    <div class="panel-section">
+      <h2>Conocimiento Destilado por la IA</h2>
+      <p class="subtitle">La IA lee los PDFs subidos y extrae reglas automáticas.</p>
+      
+      <div *ngIf="normativas.length === 0" class="empty-state">No hay normativas procesadas.</div>
+      
+      <div *ngFor="let pdf of normativas" class="pdf-card" style="margin-bottom: 20px; background: white; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
+        
+        <div style="background: #F8FAFC; padding: 12px 16px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between;">
+          <strong>📄 {{ pdf.archivoOriginal }}</strong>
+          <small>Procesado el: {{ pdf.subidoEn | date:'dd/MM/yyyy' }}</small>
+        </div>
+
+        <div style="padding: 16px;">
+          <h4 style="margin-top: 0; color: #3B82F6;">{{ pdf.conocimientoExtraido?.length || 0 }} Reglas extraídas:</h4>
+          
+          <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+            <li *ngFor="let qa of pdf.conocimientoExtraido" style="background: #F1F5F9; padding: 12px; border-radius: 6px;">
+              <div style="font-weight: 600; color: #1E293B; margin-bottom: 4px;">Q: {{ qa.pregunta }}</div>
+              <div style="color: #475569; font-size: 14px;">A: {{ qa.respuesta }}</div>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>

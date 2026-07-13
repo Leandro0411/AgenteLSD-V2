@@ -1,0 +1,77 @@
+<div class="analytics-page">
+  <div class="page-header">
+    <h1>📈 Analítica de Errores</h1>
+    <p>Basado en tus {{ historialAnalizado }} validaciones históricas.</p>
+  </div>
+
+  <div *ngIf="cargando" class="loading">Cargando métricas...</div>
+  <div *ngIf="!cargando && errorCarga" class="error-banner">⚠️ {{ errorCarga }}</div>
+
+
+  <div *ngIf="!cargando && historialAnalizado > 0" class="dashboard-grid">
+    
+    <div class="card donut-card">
+      <div class="card-header">
+        <h3>Estado de las Validaciones</h3>
+      </div>
+      <div class="donut-container">
+        <div class="donut-chart" [style.background]="getDonutGradient()"></div>
+        
+        <div class="donut-legend">
+          <div class="legend-item">
+            <span class="dot" style="background: #10B981;"></span>
+            <div class="legend-text">
+              <span class="lbl">Presentables</span>
+              <span class="pct">{{ pctOk }}%</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <span class="dot" style="background: #F59E0B;"></span>
+            <div class="legend-text">
+              <span class="lbl">Con Advertencias</span>
+              <span class="pct">{{ pctAdvertencias }}%</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <span class="dot" style="background: #EF4444;"></span>
+            <div class="legend-text">
+              <span class="lbl">Rechazados (Críticos)</span>
+              <span class="pct">{{ pctCriticos }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card top10-card">
+      <div class="card-header">
+        <span class="icon">📉</span>
+        <h3>Top 10 Errores Frecuentes</h3>
+      </div>
+      
+      <div class="top10-list">
+        <div *ngFor="let err of topErrores; let i = index" class="error-item" [class.expanded]="errorExpandido === err.id">
+          
+          <div class="error-header" (click)="toggleError(err.id)">
+            <div class="rank">{{ i + 1 }}</div>
+            <div class="title-container">
+              <h4>{{ err.titulo }}</h4>
+            </div>
+            <div class="stats">
+              <span class="freq-badge">{{ err.frecuencia }} veces</span>
+              <span class="chevron">{{ errorExpandido === err.id ? '▲' : '▼' }}</span>
+            </div>
+          </div>
+
+          <div class="error-body" *ngIf="errorExpandido === err.id">
+            <p><strong>Causa principal:</strong> {{ err.causa }}</p>
+            <p><strong>Solución:</strong> {{ err.solucion }}</p>
+            <p class="impact-text">👥 Este error afectó a un total histórico de {{ err.cuilsAfectadosTotal }} CUILs.</p>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

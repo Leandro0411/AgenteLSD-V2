@@ -1,0 +1,292 @@
+.historial-page {
+  padding: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+
+  .historial-header {
+    margin-bottom: 24px;
+    h1 { margin: 0; font-size: 24px; color: #1E293B; }
+    p { margin: 4px 0 0; color: #64748B; font-size: 14px; }
+  }
+
+  .custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E2E8F0; }
+    th { background: #F8FAFC; font-weight: 600; color: #475569; }
+    tr:hover { background: #F8FAFC; }
+  }
+
+  .badge {
+    padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    &.verde { background: #DCFCE7; color: #166534; }
+    &.amarillo { background: #FEF9C3; color: #854D0E; }
+    &.rojo { background: #FEE2E2; color: #991B1B; }
+  }
+
+  .empty-state, .loading-state {
+    text-align: center; padding: 40px; color: #64748B; background: white;
+    border-radius: 8px; border: 1px dashed #CBD5E1;
+  }
+
+    /* ── ESTILOS PARA LA FILA DESPLEGABLE ── */
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    
+    &:hover { background-color: #F1F5F9; }
+    &.abierta { background-color: #F8FAFC; }
+  }
+
+  .col-icon {
+    color: #94A3B8;
+    text-align: center;
+    font-size: 12px;
+    width: 40px;
+  }
+
+  .detalle-row {
+    background: #F8FAFC;
+    
+    td {
+      padding: 0 !important; /* Quitamos el padding normal para que el contenedor ocupe todo */
+      border-bottom: 2px solid #CBD5E1 !important;
+    }
+  }
+
+  .detalle-container {
+    padding: 20px 24px;
+    border-left: 4px solid #3B82F6;
+    background-image: linear-gradient(to right, #F8FAFC, #FFFFFF);
+    transition: border-color 0.2s;
+
+    &.borde-rojo    { border-left-color: #EF4444; }
+    &.borde-verde   { border-left-color: #22C55E; }
+    &.borde-amarillo{ border-left-color: #F59E0B; }
+
+    // ── Banner sin detalle (registros antiguos) ───────────────────────────────
+    .sin-detalle-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px;
+      border-radius: 10px;
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      margin-bottom: 12px;
+
+      &.critico {
+        background: #FEF2F2;
+        border-color: #FECACA;
+        .sin-detalle-icono { color: #DC2626; }
+      }
+      &.ok {
+        background: #F0FDF4;
+        border-color: #BBF7D0;
+        .sin-detalle-icono { color: #16A34A; }
+      }
+
+      .sin-detalle-icono {
+        font-size: 28px;
+        flex-shrink: 0;
+        line-height: 1;
+      }
+
+      .sin-detalle-texto {
+        flex: 1;
+        strong {
+          display: block;
+          font-size: 14px;
+          color: #1E293B;
+          margin-bottom: 4px;
+        }
+        p {
+          margin: 0;
+          font-size: 13px;
+          color: #64748B;
+          line-height: 1.5;
+        }
+      }
+
+      // Mini estadísticas de registros por tipo
+      .sin-detalle-stats {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+        align-items: center;
+
+        .reg-stat {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background: white;
+          border: 1px solid #E2E8F0;
+          border-radius: 6px;
+          padding: 4px 8px;
+          min-width: 44px;
+
+          .reg-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .reg-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1E293B;
+            font-variant-numeric: tabular-nums;
+          }
+        }
+      }
+    }
+
+    // ── Resumen de texto ─────────────────────────────────────────────────────
+    .resumen-texto {
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: #475569;
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    .problemas-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+
+    .problema-mini-card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+
+      &.critico    { border-left: 4px solid #EF4444; }
+      &.advertencia{ border-left: 4px solid #F59E0B; }
+
+      .prob-head {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 10px;
+        strong { font-size: 14px; color: #0F172A; line-height: 1.3; }
+      }
+
+      .prob-desc {
+        margin: 0 0 6px 0;
+        font-size: 13px;
+        color: #475569;
+        line-height: 1.4;
+      }
+
+      .prob-meta {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: #64748B;
+        font-weight: 600;
+      }
+    }
+
+    // ── Chips de resumen rápido ───────────────────────────────────────────────
+    .resumen-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+
+      .chip {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .chip-empleados  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+      .chip-critico    { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+      .chip-adv        { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+      .chip-ok         { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+    }
+
+    // ── Mini tabla de empleados afectados ─────────────────────────────────────
+    .mini-tabla-wrap {
+      margin-top: 12px;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+
+      .tabla-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .tabla-mini {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        white-space: nowrap;
+
+        thead tr { background: linear-gradient(135deg, #1E293B 0%, #334155 100%); }
+        th {
+          padding: 8px 12px;
+          color: #E2E8F0;
+          font-weight: 600;
+          font-size: 11px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          &.col-money { text-align: right; }
+          &.col-num   { text-align: center; width: 50px; }
+        }
+
+        tbody tr {
+          &.fila-par   { background: #FAFBFC; }
+          &:not(.fila-par) { background: #fff; }
+          &:hover      { background: #EFF6FF; }
+          &:last-child td { border-bottom: none; }
+        }
+
+        td {
+          padding: 8px 12px;
+          border-bottom: 1px solid #F1F5F9;
+          color: #374151;
+          &.cell-num   { text-align: center; color: #6B7280; }
+          &.cell-money { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+          &.cell-neg   { color: #DC2626 !important; font-weight: 700; background: rgba(220,38,38,0.04); }
+        }
+      }
+
+      .cuil-badge {
+        display: inline-block;
+        background: #EFF6FF;
+        color: #1D4ED8;
+        border: 1px solid #BFDBFE;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 11px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .tabla-footer {
+        display: flex;
+        justify-content: flex-end;
+        padding: 6px 12px;
+        background: #F8FAFC;
+        border-top: 1px solid #E2E8F0;
+        font-size: 11px;
+        color: #94A3B8;
+        font-style: italic;
+      }
+    }
+  }
+}

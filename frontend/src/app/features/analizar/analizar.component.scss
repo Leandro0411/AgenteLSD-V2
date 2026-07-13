@@ -1,0 +1,545 @@
+/* ── ANIMACIÓN DE CARGA (SPINNER) ── */
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.lsd-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #E2E8F0;
+  border-top-color: #3B82F6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── TABLA DE EMPLEADOS AFECTADOS ── */
+.afectados-section {
+  margin-top: 16px;
+  border-top: 1px dashed #CBD5E1;
+  padding-top: 16px;
+
+  .btn-toggle-tabla {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    color: #334155;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+
+    .icon { font-size: 15px; }
+
+    &:hover {
+      background: #E2E8F0;
+      color: #0F172A;
+      border-color: #94A3B8;
+    }
+  }
+
+  /* ── Contenedor con scroll horizontal ── */
+  .tabla-afectados-container {
+    margin-top: 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    overflow: hidden;
+    animation: slideDown 0.25s ease-out;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .tabla-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabla-afectados {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    white-space: nowrap;
+
+    /* ── Encabezados ── */
+    thead tr {
+      background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+    }
+    th {
+      padding: 11px 14px;
+      text-align: left;
+      color: #E2E8F0;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: none;
+
+      &.col-money { text-align: right; }
+      &.col-num   { text-align: center; width: 60px; }
+    }
+
+    /* ── Filas ── */
+    tbody tr {
+      transition: background 0.12s;
+      &.fila-par  { background: #FAFBFC; }
+      &:not(.fila-par) { background: #fff; }
+      &:hover     { background: #EFF6FF; }
+      &:last-child td { border-bottom: none; }
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #374151;
+
+      /* Números centrados */
+      &.cell-num {
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        color: #6B7280;
+        font-size: 12px;
+      }
+
+      /* Importes alineados a la derecha */
+      &.cell-money {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 500;
+        color: #1E293B;
+        letter-spacing: 0.01em;
+      }
+
+      /* Diferencia negativa = roja */
+      &.cell-neg {
+        color: #DC2626 !important;
+        font-weight: 700;
+        background: rgba(220, 38, 38, 0.04);
+      }
+
+      /* CUIL como badge */
+      &.cell-cuil {
+        white-space: nowrap;
+      }
+    }
+  }
+
+  /* ── Badge de CUIL ── */
+  .cuil-badge {
+    display: inline-block;
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Footer de la tabla ── */
+  .tabla-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 16px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    font-size: 12px;
+    color: #94A3B8;
+    font-style: italic;
+  }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── ACCIONES POST ANÁLISIS (RATING Y TICKET) ── */
+.acciones-post-analisis {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px dashed #CBD5E1;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 100%;
+
+  .caja-accion {
+    flex: 1;
+    min-width: 300px;
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 24px;
+    
+    /* ESTO OBLIGA A QUE TODO VAYA UNO ABAJO DEL OTRO */
+    display: flex;
+    flex-direction: column; 
+    align-items: center;
+
+    h3 { 
+      margin: 0 0 8px; 
+      color: #1E293B; 
+      font-size: 16px; 
+      font-weight: 600; 
+      text-align: center;
+    }
+    
+    p { 
+      margin: 0 0 16px; 
+      color: #64748B; 
+      font-size: 13px; 
+      text-align: center;
+    }
+
+    /* ESTRELLAS CORREGIDAS */
+    .stars-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+      
+      .star {
+        font-size: 38px;
+        color: #CBD5E1; /* Gris clarito por defecto */
+        cursor: pointer;
+        transition: color 0.15s ease; /* Un poquito más rápido para que se sienta fluido */
+        margin: 0 4px;
+        user-select: none;
+        
+        /* 1. Amarillito suave cuando pasas el mouse */
+        &.hovered { 
+          color: #FCD34D; 
+        } 
+        
+        /* 2. Amarillo fuerte cuando hacés clic (!important le gana al hover) */
+        &.activa { 
+          color: #F59E0B !important; 
+        } 
+      }
+    }
+
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 14px;
+      resize: vertical;
+      margin-bottom: 16px;
+      font-family: inherit;
+      outline: none;
+      
+      &:focus { border-color: #3B82F6; }
+    }
+
+    button {
+      width: 100%; /* Forzamos a que el botón ocupe todo el ancho */
+      padding: 12px;
+    }
+  }
+
+  .ticket-form {
+    width: 100%;
+    margin-top: 16px;
+    
+    .ticket-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+      
+      button { width: auto; } /* Acá los botones sí pueden ir uno al lado del otro */
+    }
+  }
+
+  .btn-cancel {
+    background: white;
+    border: 1px solid #CBD5E1;
+    color: #475569;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    &:hover { background: #F1F5F9; }
+  }
+
+  .btn-secondary {
+    background: white;
+    border: 1px solid #3B82F6;
+    color: #3B82F6;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    &:hover { background: #EFF6FF; }
+  }
+
+  .exito-msg {
+    flex: 1;
+    min-width: 300px;
+    background: #DCFCE7;
+    color: #166534;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    align-self: center;
+  }
+}
+
+/* ── DASHBOARD DE MÉTRICAS ─────────────────────────────────────────────────── */
+.dashboard-metricas {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  .dash-section {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+
+  .dash-title {
+    margin: 0 0 18px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1E293B;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Dona de distribución ── */
+  .donut-layout {
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    flex-wrap: wrap;
+  }
+
+  .donut-wrap {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    flex-shrink: 0;
+  }
+
+  .donut-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    -webkit-mask: radial-gradient(farthest-side, transparent 61%, #000 62%);
+    mask:         radial-gradient(farthest-side, transparent 61%, #000 62%);
+    transition: background 0.7s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Texto centrado encima de la dona, no afectado por mask */
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .donut-center-num {
+    font-size: 30px;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .donut-center-lbl {
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 500;
+    margin-top: 3px;
+  }
+
+  /* ── Leyenda de la dona ── */
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &.ok   { background: #10B981; }
+    &.adv  { background: #F59E0B; }
+    &.crit { background: #EF4444; }
+  }
+
+  .legend-text {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .legend-label {
+    font-size: 13px;
+    color: #374151;
+    font-weight: 500;
+    min-width: 110px;
+  }
+
+  .legend-pct {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0F172A;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-n {
+    font-size: 12px;
+    color: #94A3B8;
+    font-variant-numeric: tabular-nums;
+    &::before { content: '('; }
+    &::after  { content: ')'; }
+  }
+
+  /* ── Barras por tipo de error ── */
+  .errores-por-tipo {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tipo-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 140px 60px;
+    align-items: center;
+    gap: 10px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 80px 1fr 50px;
+      .tipo-bar-track { display: none; }
+    }
+  }
+
+  .tipo-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+
+    &.critico      { background: #FEE2E2; color: #DC2626; }
+    &.advertencia  { background: #FEF3C7; color: #D97706; }
+  }
+
+  .tipo-titulo {
+    font-size: 13px;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tipo-bar-track {
+    height: 8px;
+    background: #E2E8F0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .tipo-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(.4,0,.2,1);
+    min-width: 4px;
+
+    &.critico      { background: linear-gradient(90deg, #EF4444, #F87171); }
+    &.advertencia  { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+  }
+
+  .tipo-cuils {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Chips de registros del archivo ── */
+  .reg-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .reg-chip {
+    flex: 1;
+    min-width: 90px;
+    background: white;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform 0.15s, box-shadow 0.15s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+  }
+
+  .reg-chip-type {
+    font-size: 11px;
+    font-weight: 700;
+    color: #3B82F6;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .reg-chip-count {
+    font-size: 26px;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reg-chip-label {
+    font-size: 11px;
+    color: #64748B;
+    margin-top: 2px;
+  }
+}

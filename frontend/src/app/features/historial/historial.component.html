@@ -1,0 +1,157 @@
+<div class="historial-page">
+  <div class="historial-header">
+    <h1>📂 Mi Historial</h1>
+    <p>Registro de todos los archivos LSD que validaste</p>
+  </div>
+
+  <div *ngIf="cargando" class="loading-state">Cargando tu historial...</div>
+  <div *ngIf="error" class="error-banner">⚠️ {{ error }}</div>
+
+  <div *ngIf="!cargando && historial.length === 0" class="empty-state">
+    Todavía no analizaste ningún archivo.
+  </div>
+
+  <table *ngIf="!cargando && historial.length > 0" class="custom-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Archivo</th>
+        <th>Veredicto</th>
+        <th>Empleados</th>
+        <th>Errores</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let h of historial; let i = index">
+
+        <tr (click)="toggleFila(i)" class="clickable-row" [class.abierta]="filaExpandida === i">
+          <td>{{ h.fechaAnalisis | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td><strong>{{ h.nombreArchivo }}</strong></td>
+          <td>
+            <span class="badge" [ngClass]="{
+              'verde':    h.veredicto === 'PRESENTABLE',
+              'amarillo': h.veredicto === 'REVISAR',
+              'rojo':     h.veredicto === 'SERÁ RECHAZADO'
+            }">{{ h.veredicto }}</span>
+          </td>
+          <td>{{ h.estadisticas?.total_empleados ?? '-' }}</td>
+          <td>{{ h.estadisticas?.errores_criticos ?? 0 }}</td>
+          <td class="col-icon">{{ filaExpandida === i ? '▲' : '▼' }}</td>
+        </tr>
+
+        <!-- ── Fila expandida ── -->
+        <tr *ngIf="filaExpandida === i" class="detalle-row">
+          <td colspan="6">
+            <div class="detalle-container" [class.borde-rojo]="h.veredicto === 'SERÁ RECHAZADO'" [class.borde-verde]="h.veredicto === 'PRESENTABLE'" [class.borde-amarillo]="h.veredicto === 'REVISAR'">
+
+              <!-- Chips de resumen -->
+              <div class="resumen-chips">
+                <span class="chip chip-empleados">👥 {{ h.estadisticas.empleados_afectados_critico || '?' }} empleado(s) afectados</span>
+                <span class="chip chip-conceptos" *ngIf="h.estadisticas?.total_conceptos">📋 {{ h.estadisticas.total_conceptos }} concepto(s)</span>
+                <span class="chip chip-critico" *ngIf="h.estadisticas?.errores_criticos > 0">
+                  ❌ {{ h.estadisticas.errores_criticos }} error(es) crítico(s)
+                </span>
+                <span class="chip chip-adv" *ngIf="h.estadisticas?.advertencias > 0">
+                  ⚠️ {{ h.estadisticas.advertencias }} advertencia(s)
+                </span>
+                <span class="chip chip-ok" *ngIf="h.estadisticas?.errores_criticos === 0 && h.estadisticas?.advertencias === 0">
+                  ✅ Sin errores detectados
+                </span>
+              </div>
+
+              <!-- CASO A: hay problemas detallados guardados → mostrar tarjetas -->
+              <ng-container *ngIf="getProblemas(h).length > 0">
+                <div class="problemas-grid">
+                  <div *ngFor="let p of getProblemas(h)" class="problema-mini-card" [ngClass]="p.severidad?.toLowerCase()">
+                    <div class="prob-head">
+                      <span class="badge" [ngClass]="p.severidad?.toLowerCase()">{{ p.severidad }}</span>
+                      <strong>{{ p.titulo || p.id }}</strong>
+                    </div>
+                    <p class="prob-meta">👥 Afecta a <strong>{{ p.cuils_afectados }}</strong> empleado(s)</p>
+                    <p class="prob-desc"><strong>Causa:</strong> {{ p.causa }}</p>
+                    <p class="prob-desc"><strong>Solución:</strong> {{ p.solucion }}</p>
+
+                    <div class="mini-tabla-wrap" *ngIf="p.filas_tabla?.length">
+                      <div class="tabla-scroll">
+                        <table class="tabla-mini">
+                          <thead>
+                            <tr>
+                              <th *ngFor="let col of p.columnas_tabla"
+                                  [class.col-money]="col.includes('$')"
+                                  [class.col-num]="col === 'Línea' || col === 'Cantidad REG04'">
+                                {{ col }}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let fila of p.filas_tabla; let fi = index" [class.fila-par]="fi % 2 === 0">
+                              <td *ngFor="let col of p.columnas_tabla"
+                                  [class.cell-money]="col.includes('$')"
+                                  [class.cell-neg]="col.includes('Diferencia') && fila[col] && fila[col] !== '—'"
+                                  [class.cell-num]="col === 'Línea' || col === 'Cantidad REG04'"
+                                  [class.cell-cuil]="col === 'CUIL'">
+                                <ng-container *ngIf="col === 'CUIL'; else normalCell">
+                                  <span class="cuil-badge">{{ fila[col] }}</span>
+                                </ng-container>
+                                <ng-template #normalCell>{{ fila[col] }}</ng-template>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="tabla-footer">
+                        <span>{{ p.filas_tabla.length }} registro(s) · {{ p.cuils_afectados }} CUIL(s)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- CASO B: sin detalle guardado pero hay errores conocidos por estadísticas -->
+              <ng-container *ngIf="getProblemas(h).length === 0 && (h.estadisticas?.errores_criticos > 0 || h.estadisticas?.advertencias > 0)">
+                <div class="sin-detalle-banner" [class.critico]="h.estadisticas?.errores_criticos > 0">
+                  <div class="sin-detalle-icono">{{ h.estadisticas?.errores_criticos > 0 ? '🚫' : '⚠️' }}</div>
+                  <div class="sin-detalle-texto">
+                    <strong>
+                      {{ h.estadisticas?.errores_criticos > 0
+                        ? 'Este archivo tiene ' + h.estadisticas.errores_criticos + ' error(es) crítico(s) y no va a pasar ARCA.'
+                        : 'Este archivo tiene ' + h.estadisticas.advertencias + ' advertencia(s) a revisar.'
+                      }}
+                    </strong>
+                    <p>
+                      El detalle por empleado no está disponible para este análisis.
+                      Volvé a subir el archivo para obtener el informe completo con los CUILs y valores afectados.
+                    </p>
+                  </div>
+                  <div class="sin-detalle-stats" *ngIf="h.validacionDeterministica?.registros_por_tipo">
+                    <div class="reg-stat" *ngFor="let tipo of ['01','02','03','04','05']">
+                      <span class="reg-label">REG{{ tipo }}</span>
+                      <span class="reg-val">{{ h.validacionDeterministica.registros_por_tipo[tipo] || 0 }}</span>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- CASO C: sin errores y sin detalle = archivo OK -->
+              <ng-container *ngIf="getProblemas(h).length === 0 && !h.estadisticas?.errores_criticos && !h.estadisticas?.advertencias">
+                <div class="sin-detalle-banner ok">
+                  <div class="sin-detalle-icono">✅</div>
+                  <div class="sin-detalle-texto">
+                    <strong>Este archivo pasó todas las validaciones del motor.</strong>
+                    <p>No se detectaron errores críticos ni advertencias en el momento del análisis.</p>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- Resumen de texto si está disponible -->
+              <p class="resumen-texto" *ngIf="h.resumen">{{ h.resumen }}</p>
+
+            </div>
+          </td>
+        </tr>
+
+      </ng-container>
+    </tbody>
+  </table>
+</div>
