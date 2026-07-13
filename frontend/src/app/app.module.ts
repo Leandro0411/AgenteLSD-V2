@@ -1,7 +1,6 @@
 // src/app/app.module.ts
 import { NgModule }              from '@angular/core';
 import { BrowserModule }         from '@angular/platform-browser';
-import { CommonModule }          from '@angular/common';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { ReactiveFormsModule, FormsModule }    from '@angular/forms';
 
@@ -13,10 +12,11 @@ import { HistorialComponent } from './features/historial/historial.component';
 import { JwtInterceptor }     from './core/interceptors/jwt.interceptor';
 
 // Features
-import { LoginComponent }       from './features/login/login.component';
-import { AnalizarComponent }    from './features/analizar/analizar.component';
-import { AdminComponent }       from './features/admin/admin.component';
-import { TopErroresComponent }  from './features/top-errores/top-errores.component';
+import { LoginComponent }     from './features/login/login.component';
+import { AnalizarComponent }  from './features/analizar/analizar.component';
+import { AdminComponent }     from './features/admin/admin.component';
+import { TopErroresComponent } from './features/top-errores/top-errores.component';
+import { MisTicketsComponent } from './features/mis-tickets/mis-tickets.component';
 
 // Shared
 import { LayoutComponent }    from './shared/components/layout/layout.component';
@@ -30,10 +30,10 @@ import { LayoutComponent }    from './shared/components/layout/layout.component'
     LayoutComponent,
     HistorialComponent,
     TopErroresComponent,
+    MisTicketsComponent,
   ],
   imports: [
     BrowserModule,
-    CommonModule,
     HttpClientModule,
     ReactiveFormsModule,
     FormsModule,
@@ -45,4 +45,3 @@ import { LayoutComponent }    from './shared/components/layout/layout.component'
   bootstrap: [AppComponent],
 })
 export class AppModule {}
-

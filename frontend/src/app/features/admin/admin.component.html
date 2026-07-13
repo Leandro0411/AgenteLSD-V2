@@ -79,12 +79,45 @@
           <span class="ticket-fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>
           <span class="badge" [ngClass]="t.estado">{{ t.estado }}</span>
         </div>
-        <p class="ticket-archivo">📄 Archivo: <strong>{{ t.archivo }}</strong></p>
+        
+        <div class="ticket-archivo-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <p class="ticket-archivo" style="margin: 0;">📄 Archivo: <strong>{{ t.archivo }}</strong></p>
+          <button class="btn-secondary-sm" (click)="descargarOriginal(t)" *ngIf="t.sessionId">
+            ⬇️ Descargar TXT Original
+          </button>
+        </div>
+
         <div class="ticket-cuerpo">
           <p class="ticket-mensaje">"{{ t.mensaje }}"</p>
         </div>
-        <div class="ticket-footer" *ngIf="t.estado === 'abierto'">
-          <button class="btn-secondary-sm" (click)="cerrarTicket(t.ticketId)">✔️ Marcar resuelto</button>
+
+        <div class="respuestas-historial" *ngIf="t.respuestas?.length">
+          <h4 style="margin: 16px 0 8px; font-size: 13px; color: #475569;">Historial de Respuestas:</h4>
+          <div *ngFor="let resp of t.respuestas" class="respuesta-item" style="background: #F1F5F9; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #64748B;">
+              <strong>Consultor: {{ resp.adminUsername }}</strong>
+              <span>{{ resp.fecha | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+            <p style="margin: 0; font-size: 14px; color: #1E293B;">{{ resp.texto }}</p>
+            <div *ngIf="resp.archivoCorregido" style="margin-top: 8px; font-size: 13px; color: #16A34A;">
+              📎 Archivo adjunto: {{ resp.nombreArchivoCorregido }}
+            </div>
+          </div>
+        </div>
+
+        <div class="ticket-respuesta-form" *ngIf="t.estado === 'abierto'" style="margin-top: 16px; border-top: 1px dashed #CBD5E1; padding-top: 16px;">
+          <textarea [(ngModel)]="textoRespuesta[t.ticketId]" rows="3" placeholder="Escribí la respuesta para el cliente..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #CBD5E1; margin-bottom: 8px;"></textarea>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <input type="file" accept=".txt" (change)="onArchivoRespuestaChange($event, t.ticketId)" style="font-size: 13px; color: #64748B;">
+            
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-cancel" (click)="cerrarTicket(t.ticketId)">Cerrar sin responder</button>
+              <button class="btn-primary" (click)="enviarRespuesta(t.ticketId)" [disabled]="!textoRespuesta[t.ticketId] || respondiendoTicket[t.ticketId]">
+                {{ respondiendoTicket[t.ticketId] ? 'Enviando...' : 'Responder y Cerrar' }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -108,6 +141,8 @@
         </div>
       </div>
     </div>
+
+    
 
   </div>
 

@@ -1,0 +1,46 @@
+<div class="mis-tickets-page">
+  <div class="page-header">
+    <h1>📩 Mis Tickets de Soporte</h1>
+    <p>Acá podés ver las respuestas de los consultores y descargar tus archivos corregidos.</p>
+  </div>
+
+  <div *ngIf="cargando" class="loading">Cargando tickets...</div>
+  
+  <div *ngIf="!cargando && tickets.length === 0" class="empty-state">
+    No tenés tickets de soporte abiertos ni en el historial.
+  </div>
+
+  <div class="tickets-list">
+    <div *ngFor="let t of tickets" class="ticket-card" [ngClass]="t.estado">
+      <div class="ticket-header">
+        <span class="badge" [ngClass]="t.estado">{{ t.estado === 'abierto' ? '⏳ Abierto' : '✅ Cerrado' }}</span>
+        <span class="fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+      
+      <p class="archivo-orig">📄 Archivo enviado: <strong>{{ t.archivo }}</strong></p>
+      
+      <div class="mensaje-usuario">
+        <p><strong>Tu consulta:</strong></p>
+        <p class="texto-msg">"{{ t.mensaje }}"</p>
+      </div>
+
+      <div class="respuestas-container" *ngIf="t.respuestas?.length">
+        <div *ngFor="let resp of t.respuestas; let i = index" class="respuesta-box">
+          <div class="resp-header">
+            <strong>👨‍💻 Respuesta del Consultor</strong>
+            <span>{{ resp.fecha | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <p class="resp-texto">{{ resp.texto }}</p>
+          
+          <button *ngIf="resp.archivoCorregido" class="btn-descarga" (click)="descargarArchivo(t.ticketId, i, resp.nombreArchivoCorregido)">
+            ⬇️ Descargar {{ resp.nombreArchivoCorregido }}
+          </button>
+        </div>
+      </div>
+      
+      <div *ngIf="t.estado === 'abierto' && !t.respuestas?.length" class="espera-box">
+        Tu ticket fue recibido. Un consultor te responderá a la brevedad.
+      </div>
+    </div>
+  </div>
+</div>

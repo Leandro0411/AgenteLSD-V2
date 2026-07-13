@@ -51,6 +51,17 @@ export class AdminService {
     return this.http.post<any>(`${this.API}/tickets`, data);
   }
 
+  responderTicket(ticketId: string, texto: string, archivo?: File): Observable<any> {
+    const form = new FormData();
+    form.append('texto', texto);
+    if (archivo) form.append('archivo', archivo);
+    return this.http.post<any>(`${this.API}/tickets/${ticketId}/responder`, form);
+  }
+
+  descargarArchivoOriginal(ticketId: string): Observable<Blob> {
+    return this.http.get(`${this.API}/tickets/${ticketId}/archivo-original`, { responseType: 'blob' });
+  }
+
   // ── Wiki Reglas ─────────────────────────────────────────────────────────────
   getReglas(): Observable<{ ok: boolean; reglas: any[] }> {
     return this.http.get<any>(`${this.API}/wiki/reglas`);

@@ -9,6 +9,8 @@ const { verificarToken } = require('../middleware/auth');
 const { analizarArchivo } = require('../services/pythonBridge');
 const HistorialAnalisis  = require('../models/HistorialAnalisis');
 
+const ORIGINALES_DIR = path.resolve(__dirname, '../../uploads/originales');
+
 const router = express.Router();
 
 // ── Configuración multer — diskStorage obligatorio ────────────────────────────
@@ -16,6 +18,7 @@ const UPLOAD_DIR = path.resolve(__dirname, '../../uploads/tmp');
 
 // Crear carpeta si no existe (evita error de multer al arrancar)
 require('fs').mkdirSync(UPLOAD_DIR, { recursive: true });
+require('fs').mkdirSync(ORIGINALES_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -43,6 +46,11 @@ router.post('/upload', verificarToken, upload.single('archivo'), async (req, res
   const modoRaw = req.body.modo || 'profundo';
   const modo = ['auto', 'rapido', 'profundo'].includes(modoRaw) ? modoRaw : 'profundo';
   const sessionId = uuidv4();
+
+  // Hacer una copia segura del TXT original para que el admin lo pueda descargar
+  const fs = require('fs');
+  const rutaOriginal = path.join(ORIGINALES_DIR, `${sessionId}.txt`);
+  fs.copyFileSync(req.file.path, rutaOriginal);
 
   try {
     // Crear registro pendiente en MongoDB (guarda la ruta temporal para el stream)

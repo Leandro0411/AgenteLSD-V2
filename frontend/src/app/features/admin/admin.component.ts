@@ -25,6 +25,51 @@ export class AdminComponent implements OnInit {
 
   subTabTickets: 'soporte' | 'ratings' = 'soporte';
 
+  // ── Respuestas a Tickets ──────────────────────────────────────────────────
+  textoRespuesta: { [id: string]: string } = {};
+  archivoRespuesta: { [id: string]: File | null } = {};
+  respondiendoTicket: { [id: string]: boolean } = {};
+
+  onArchivoRespuestaChange(e: Event, ticketId: string): void {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    this.archivoRespuesta[ticketId] = file || null;
+  }
+
+  enviarRespuesta(ticketId: string): void {
+    const texto = this.textoRespuesta[ticketId];
+    if (!texto) return;
+
+    this.respondiendoTicket[ticketId] = true;
+    const archivo = this.archivoRespuesta[ticketId] || undefined;
+
+    this.admin.responderTicket(ticketId, texto, archivo).subscribe({
+      next: () => {
+        this.textoRespuesta[ticketId] = '';
+        this.archivoRespuesta[ticketId] = null;
+        this.respondiendoTicket[ticketId] = false;
+        this.cargarTickets(); // Recargar para ver la respuesta
+      },
+      error: (err) => {
+        alert('Error enviando respuesta: ' + (err.error?.error || err.message));
+        this.respondiendoTicket[ticketId] = false;
+      }
+    });
+  }
+
+  descargarOriginal(ticket: any): void {
+    this.admin.descargarArchivoOriginal(ticket.ticketId).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ticket.archivo || 'original.txt';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => alert('El archivo original ya no se encuentra en el servidor.')
+    });
+  }
+
   get ticketsDeSoporte() {
     return this.tickets.filter(t => t.tipo === 'ticket');
   }

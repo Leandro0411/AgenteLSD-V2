@@ -41,13 +41,25 @@ export class LsdService {
   }
 
   // Enviar feedback (estrellas) O ticket de soporte
-  enviarFeedbackOTicket(archivo: string, tipo: 'rating' | 'ticket', mensaje: string, estrellas: number = 0) {
+  enviarFeedbackOTicket(archivo: string, tipo: 'rating' | 'ticket', mensaje: string, estrellas: number = 0, sessionId: string = '') {
     return this.http.post<any>(`${this.API}/tickets`, {
       archivo, 
       tipo, 
       estrellas, 
-      mensaje
+      mensaje,
+      sessionId
     }, { headers: this.getAuthHeaders() });
+  }
+
+  descargarArchivoRespuesta(ticketId: string, index: number): Observable<Blob> {
+    return this.http.get(`${this.API}/tickets/${ticketId}/archivo-respuesta/${index}`, { 
+      responseType: 'blob',
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  getMisTickets(): Observable<{ ok: boolean; data: any[] }> {
+    return this.http.get<any>(`${this.API}/tickets/mios`, { headers: this.getAuthHeaders() });
   }
 
   // ── SSE streaming del análisis ──────────────────────────────────────────────

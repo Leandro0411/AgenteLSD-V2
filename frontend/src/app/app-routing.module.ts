@@ -9,6 +9,7 @@ import { AnalizarComponent }  from './features/analizar/analizar.component';
 import { AdminComponent }     from './features/admin/admin.component';
 import { LayoutComponent }    from './shared/components/layout/layout.component';
 import { TopErroresComponent } from './features/top-errores/top-errores.component';
+import { MisTicketsComponent } from './features/mis-tickets/mis-tickets.component';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -23,6 +24,7 @@ const routes: Routes = [
       { path: 'admin',    component: AdminComponent, canActivate: [AdminGuard] },
       { path: 'historial', component: HistorialComponent },
       { path: 'top-errores', component: TopErroresComponent },
+      { path: 'mis-tickets', component: MisTicketsComponent },
     ],
   },
   { path: '**', redirectTo: 'login' },
