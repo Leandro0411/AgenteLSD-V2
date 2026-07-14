@@ -4,6 +4,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { verificarToken }  = require('../middleware/auth');
 const HistorialAnalisis   = require('../models/HistorialAnalisis');
 const ReglaNormativa      = require('../models/ReglaNormativa');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
@@ -19,6 +21,7 @@ router.post('/', verificarToken, async (req, res) => {
   // Obtener informe de MongoDB si hay sessionId
   let informeContexto = informeCliente || null;
   let validacionDeterministica = null;
+  let contenidoTxt = null; // 👈 NUEVO: Variable para guardar el texto del archivo
 
   if (sessionId) {
     try {
@@ -27,7 +30,21 @@ router.post('/', verificarToken, async (req, res) => {
         informeContexto        = sesion.toObject();
         validacionDeterministica = sesion.validacionDeterministica;
       }
-    } catch (_) {}
+
+      // 👇 NUEVO: Buscar y leer el archivo TXT original 👇
+      const rutaOriginal = path.resolve(__dirname, '../../uploads/originales', `${sessionId}.txt`);
+      if (fs.existsSync(rutaOriginal)) {
+        const rawText = fs.readFileSync(rutaOriginal, 'utf-8');
+        // Le pasamos hasta 150.000 caracteres (aprox 40.000 tokens) para que vea la cabecera y muchos empleados, sin saturar la memoria.
+        contenidoTxt = rawText.length > 150000 
+          ? rawText.substring(0, 150000) + '\n\n... [EL ARCHIVO CONTINÚA, SE RECORTÓ POR TAMAÑO MÁXIMO]' 
+          : rawText;
+      }
+      // 👆 FIN NUEVO 👆
+
+    } catch (err) {
+      console.warn('[chat] Error leyendo sesión o archivo original:', err.message);
+    }
   }
 
   const contexto = {
@@ -35,6 +52,7 @@ router.post('/', verificarToken, async (req, res) => {
     hay_txt_cargado: Boolean(sessionId),
     informe: informeContexto,
     validacion_deterministica: validacionDeterministica,
+    contenido_txt: contenidoTxt // 👈 NUEVO: Se lo pasamos a Gemini
   };
 
   // ── Buscar reglas de conocimiento relevantes (RAG liviano) ─────────────────
@@ -619,7 +637,10 @@ ${JSON.stringify(contexto, null, 2)}`;
 
   try {
     const genai  = new GoogleGenerativeAI(apiKey);
-    const model  = genai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model  = genai.getGenerativeModel({ 
+      model: 'gemini-2.5-flash',
+      systemInstruction: systemPrompt 
+    });
 
     // Convertir historial de mensajes al formato de Gemini
     const historial = messages.slice(-12).map((m) => ({
@@ -627,10 +648,15 @@ ${JSON.stringify(contexto, null, 2)}`;
       parts: [{ text: String(m.content || '').trim() }],
     })).filter(m => m.parts[0].text);
 
+    // Limpiar el inicio del array para que el primero siempre sea 'user'
+    while (historial.length > 0 && historial[0].role === 'model') {
+      historial.shift();
+    }
+
+    // Iniciamos el chat SIN el systemInstruction (porque ya lo tiene el modelo)
     const chat = model.startChat({
       history: historial.slice(0, -1), // todo excepto el último mensaje
-      generationConfig: { temperature: 0.2 },
-      systemInstruction: systemPrompt,
+      generationConfig: { temperature: 0.2 }
     });
 
     const ultimoMensaje = historial.at(-1)?.parts[0]?.text || '';

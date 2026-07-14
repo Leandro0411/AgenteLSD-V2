@@ -14,7 +14,10 @@ export class MisTicketsComponent implements OnInit {
 
   ngOnInit(): void {
     this.lsd.getMisTickets().subscribe({
-      next: (res) => { this.tickets = res.data || []; this.cargando = false; },
+      next: (res) => { 
+        this.tickets = (res.data || []).filter((t: any) => t.tipo === 'ticket'); 
+        this.cargando = false; 
+      },
       error: () => this.cargando = false
     });
   }

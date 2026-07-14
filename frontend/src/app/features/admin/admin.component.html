@@ -2,14 +2,13 @@
 <div class="admin-page">
   <div class="admin-header">
     <h1>⚙️ Administración</h1>
-    <p>Gestión de usuarios, tickets, normativas e historial</p>
+    <p>Gestión de usuarios, tickets y base de conocimiento</p>
   </div>
 
   <!-- Tabs -->
   <div class="admin-tabs">
-    <button [class.active]="tabActiva === 'usuarios'"    (click)="cambiarTab('usuarios')"    id="admin-tab-usuarios">👥 Usuarios</button>
-    <button [class.active]="tabActiva === 'tickets'"     (click)="cambiarTab('tickets')"     id="admin-tab-tickets">🎫 Feedback</button>
-    <button [class.active]="tabActiva === 'normativas'"  (click)="cambiarTab('normativas')"  id="admin-tab-normativas">📄 Normativas</button>
+    <button [class.active]="tabActiva === 'usuarios'"     (click)="cambiarTab('usuarios')"     id="admin-tab-usuarios">👥 Usuarios</button>
+    <button [class.active]="tabActiva === 'tickets'"      (click)="cambiarTab('tickets')"      id="admin-tab-tickets">🎫 Feedback</button>
     <button [class.active]="tabActiva === 'conocimiento'" (click)="cambiarTab('conocimiento')" id="admin-tab-conocimiento">🧠 Conocimiento</button>
   </div>
 
@@ -147,69 +146,7 @@
 
   </div>
 
-  <!-- ── TAB: Normativas ──────────────────────────────────────────────────── -->
-  <div *ngIf="tabActiva === 'normativas'" class="tab-panel">
-    <div class="panel-section">
-      <h2>Subir y Destilar PDF</h2>
-      <p class="subtitle">Arrastrá el PDF con normativas. La IA lo va a leer y extraerá las reglas.</p>
-      
-      <div
-        class="dropzone-admin"
-        [class.dragover]="dragOverNormativa"
-        [class.selected]="pdfSeleccionado"
-        (dragover)="onDragOverNormativa($event)"
-        (dragleave)="onDragLeaveNormativa()"
-        (drop)="onDropNormativa($event)"
-        (click)="pdfInput.click()"
-      >
-        <input #pdfInput id="input-pdf" type="file" accept=".pdf" hidden (change)="onPdfInput($event)" />
-        
-        <div *ngIf="!pdfSeleccionado" class="dropzone-placeholder">
-          <span class="drop-icon">📄</span>
-          <p>Soltá el PDF acá o <strong>hacé clic</strong> para seleccionarlo</p>
-        </div>
-        
-        <div *ngIf="pdfSeleccionado" class="dropzone-selected">
-          <span class="drop-icon">✅</span>
-          <p><strong>{{ pdfSeleccionado.name }}</strong></p>
-          <small>{{ (pdfSeleccionado.size / 1024 / 1024).toFixed(2) }} MB</small>
-        </div>
-      </div>
 
-      <button id="btn-subir-pdf" class="btn-primary" style="margin-top: 16px; width: 100%;" (click)="subirNormativa()" [disabled]="!pdfSeleccionado || normativaCargando">
-        {{ normativaCargando ? 'Procesando con IA (puede tardar un minuto)...' : '📤 Extraer Conocimiento' }}
-      </button>
-
-      <p class="msg-ok"  *ngIf="normativaMsg && !normativaMsg.includes('Error')">✅ {{ normativaMsg }}</p>
-      <p class="msg-err" *ngIf="normativaMsg && normativaMsg.includes('Error')">❌ {{ normativaMsg }}</p>
-    </div>
-    <div class="panel-section">
-      <h2>Conocimiento Destilado por la IA</h2>
-      <p class="subtitle">La IA lee los PDFs subidos y extrae reglas automáticas.</p>
-      
-      <div *ngIf="normativas.length === 0" class="empty-state">No hay normativas procesadas.</div>
-      
-      <div *ngFor="let pdf of normativas" class="pdf-card" style="margin-bottom: 20px; background: white; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
-        
-        <div style="background: #F8FAFC; padding: 12px 16px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between;">
-          <strong>📄 {{ pdf.archivoOriginal }}</strong>
-          <small>Procesado el: {{ pdf.subidoEn | date:'dd/MM/yyyy' }}</small>
-        </div>
-
-        <div style="padding: 16px;">
-          <h4 style="margin-top: 0; color: #3B82F6;">{{ pdf.conocimientoExtraido?.length || 0 }} Reglas extraídas:</h4>
-          
-          <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
-            <li *ngFor="let qa of pdf.conocimientoExtraido" style="background: #F1F5F9; padding: 12px; border-radius: 6px;">
-              <div style="font-weight: 600; color: #1E293B; margin-bottom: 4px;">Q: {{ qa.pregunta }}</div>
-              <div style="color: #475569; font-size: 14px;">A: {{ qa.respuesta }}</div>
-            </li>
-          </ul>
-        </div>
-
-      </div>
-    </div>
-  </div>
 
   <!-- ── TAB: Conocimiento ──────────────────────────────────────────────── -->
   <div *ngIf="tabActiva === 'conocimiento'" class="tab-panel">
