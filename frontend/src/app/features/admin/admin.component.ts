@@ -29,6 +29,27 @@ export class AdminComponent implements OnInit {
   textoRespuesta: { [id: string]: string } = {};
   archivoRespuesta: { [id: string]: File | null } = {};
   respondiendoTicket: { [id: string]: boolean } = {};
+  // Preview del TXT original por ticket
+  previewTxt:        Record<string, { contenido: string; nombreArchivo: string; totalLineas: number; truncado: boolean } | null> = {};
+  previewCargando:   Record<string, boolean> = {};
+
+  togglePreview(ticket: any): void {
+    if (this.previewTxt[ticket.ticketId]) {
+      this.previewTxt[ticket.ticketId] = null;
+      return;
+    }
+    this.previewCargando[ticket.ticketId] = true;
+    this.admin.previewArchivoOriginal(ticket.ticketId).subscribe({
+      next: (data) => {
+        this.previewTxt[ticket.ticketId] = data;
+        this.previewCargando[ticket.ticketId] = false;
+      },
+      error: () => {
+        alert('Error cargando la vista previa.');
+        this.previewCargando[ticket.ticketId] = false;
+      }
+    });
+  }
 
   onArchivoRespuestaChange(e: Event, ticketId: string): void {
     const file = (e.target as HTMLInputElement).files?.[0];

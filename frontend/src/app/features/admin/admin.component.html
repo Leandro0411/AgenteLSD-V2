@@ -80,11 +80,37 @@
           <span class="badge" [ngClass]="t.estado">{{ t.estado }}</span>
         </div>
         
-        <div class="ticket-archivo-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="ticket-archivo-row">
           <p class="ticket-archivo" style="margin: 0;">📄 Archivo: <strong>{{ t.archivo }}</strong></p>
-          <button class="btn-secondary-sm" (click)="descargarOriginal(t)" *ngIf="t.sessionId">
-            ⬇️ Descargar TXT Original
-          </button>
+          <div class="ticket-archivo-btns" *ngIf="t.sessionId">
+            <button class="btn-secondary-sm"
+              (click)="togglePreview(t)"
+              [id]="'btn-preview-' + t.ticketId">
+              <span *ngIf="!previewCargando[t.ticketId]">
+                {{ previewTxt[t.ticketId] ? '🔼 Ocultar TXT' : '👁️ Ver TXT' }}
+              </span>
+              <span *ngIf="previewCargando[t.ticketId]">⏳ Cargando...</span>
+            </button>
+            <button class="btn-secondary-sm"
+              (click)="descargarOriginal(t)"
+              [id]="'btn-dl-' + t.ticketId">
+              ⬇️ Descargar
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview del TXT -->
+        <div *ngIf="previewTxt[t.ticketId]" class="txt-preview-panel">
+          <div class="txt-preview-header">
+            <span class="txt-preview-name">{{ previewTxt[t.ticketId]!.nombreArchivo }}</span>
+            <span class="txt-preview-meta">
+              {{ previewTxt[t.ticketId]!.totalLineas }} líneas
+              <span *ngIf="previewTxt[t.ticketId]!.truncado" class="txt-truncado">
+                · mostrando primeras 500
+              </span>
+            </span>
+          </div>
+          <pre class="txt-preview-content">{{ previewTxt[t.ticketId]!.contenido }}</pre>
         </div>
 
         <div class="ticket-cuerpo">

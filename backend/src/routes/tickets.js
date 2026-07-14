@@ -85,6 +85,36 @@ router.post('/:ticketId/responder', verificarToken, soloAdmin, uploadRespuesta.s
   }
 });
 
+// ── GET /api/tickets/:ticketId/archivo-original/preview (SOLO ADMIN) ──────────
+router.get('/:ticketId/archivo-original/preview', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ ticketId: req.params.ticketId });
+    if (!ticket || !ticket.sessionId) {
+      return res.status(404).json({ ok: false, error: 'El ticket no tiene un archivo original asociado.' });
+    }
+
+    const ruta = path.join(ORIGINALES_DIR, `${ticket.sessionId}.txt`);
+    if (!fs.existsSync(ruta)) {
+      return res.status(404).json({ ok: false, error: 'El archivo TXT ya no se encuentra en el servidor.' });
+    }
+
+    const contenido = fs.readFileSync(ruta, 'latin1'); // LSD usa latin-1
+    const lineas    = contenido.split('\n');
+    const MAX_LINEAS = 500;
+    const truncado  = lineas.length > MAX_LINEAS;
+
+    return res.json({
+      ok: true,
+      nombreArchivo: ticket.archivo || 'original.txt',
+      totalLineas:   lineas.length,
+      truncado,
+      contenido:     truncado ? lineas.slice(0, MAX_LINEAS).join('\n') : contenido,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/tickets/:ticketId/archivo-original (SOLO ADMIN) ──────────────────
 router.get('/:ticketId/archivo-original', verificarToken, soloAdmin, async (req, res) => {
   try {
@@ -103,6 +133,7 @@ router.get('/:ticketId/archivo-original', verificarToken, soloAdmin, async (req,
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 
 // ── GET /api/tickets/:ticketId/archivo-respuesta/:index ───────────────────────
 router.get('/:ticketId/archivo-respuesta/:index', verificarToken, async (req, res) => {

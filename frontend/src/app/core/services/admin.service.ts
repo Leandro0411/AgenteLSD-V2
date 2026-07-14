@@ -62,6 +62,10 @@ export class AdminService {
     return this.http.get(`${this.API}/tickets/${ticketId}/archivo-original`, { responseType: 'blob' });
   }
 
+  previewArchivoOriginal(ticketId: string): Observable<{ ok: boolean; nombreArchivo: string; totalLineas: number; truncado: boolean; contenido: string }> {
+    return this.http.get<any>(`${this.API}/tickets/${ticketId}/archivo-original/preview`);
+  }
+
   // ── Wiki Reglas (legacy) ───────────────────────────────────────────────
   getReglasWiki(): Observable<{ ok: boolean; reglas: any[] }> {
     return this.http.get<any>(`${this.API}/wiki/reglas`);
