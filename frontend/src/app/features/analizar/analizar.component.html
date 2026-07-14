@@ -229,20 +229,39 @@
     </div>
 
     <div *ngFor="let p of informe.problemas" class="problema-card" [ngClass]="p.severidad?.toLowerCase()" id="problema-{{ p.id }}">
+
+      <!-- Header clickeable -->
       <div class="problema-header" (click)="toggleProblema(p.id)">
         <div class="problema-titulo-row">
           <span class="badge" [ngClass]="p.severidad?.toLowerCase()">{{ p.severidad }}</span>
           <h3>{{ p.titulo }}</h3>
         </div>
         <div class="problema-meta">
-          <span>👥 {{ p.cuils_afectados }} empleado(s)</span>
+          <span class="afectados-chip">
+            👥 {{ p.cuils_afectados }} empleado{{ p.cuils_afectados !== 1 ? 's' : '' }}
+          </span>
           <span class="expand-icon">{{ problemaExpandido === p.id ? '▲' : '▼' }}</span>
         </div>
       </div>
 
+      <!-- Preview siempre visible: causa breve + CUILs afectados -->
+      <div class="problema-preview" (click)="toggleProblema(p.id)">
+        <p class="preview-causa" *ngIf="p.causa">
+          <span class="preview-label">⚠️ Causa:</span> {{ p.causa }}
+        </p>
+        <div class="preview-cuils" *ngIf="p.ejemplos_cuil?.length">
+          <span class="preview-label">CUILs afectados:</span>
+          <span *ngFor="let c of p.ejemplos_cuil.slice(0,3)" class="cuil-chip">{{ c }}</span>
+          <span *ngIf="p.cuils_afectados > 3" class="cuil-chip mas">+{{ p.cuils_afectados - 3 }} más</span>
+        </div>
+      </div>
+
+      <!-- Cuerpo expandible -->
       <div *ngIf="problemaExpandido === p.id" class="problema-body">
-        <p class="problema-causa"><strong>Causa:</strong> {{ p.causa }}</p>
-        <p class="problema-solucion"><strong>Solución:</strong> {{ p.solucion }}</p>
+        <div class="solucion-box" *ngIf="p.solucion">
+          <span class="solucion-label">✅ Solución:</span>
+          <p>{{ p.solucion }}</p>
+        </div>
 
         <div *ngIf="p.tutorial_pasos?.length" class="tutorial">
           <h4>📖 Pasos para corregir en e-Sueldos</h4>
@@ -266,10 +285,12 @@
           ✏️ Editar
         </button>
       </div>
+
+      <!-- Tabla de afectados (siempre disponible) -->
       <div class="afectados-section">
         <button class="btn-toggle-tabla" (click)="p.mostrarTabla = !p.mostrarTabla" [id]="'btn-tabla-' + p.id">
-          <span class="icon">👥</span>
-          {{ p.mostrarTabla ? 'Ocultar' : 'Ver' }} empleados afectados ({{ p.cuils_afectados }})
+          <span class="icon">📋</span>
+          {{ p.mostrarTabla ? 'Ocultar' : 'Ver' }} detalle de afectados ({{ p.cuils_afectados }})
         </button>
 
         <div class="tabla-afectados-container" *ngIf="p.mostrarTabla && p.filas_tabla?.length">
@@ -305,6 +326,7 @@
       </div>
     </div>
   </div>
+
 
   <div class="acciones-post-analisis" *ngIf="estado === 'completado' && !auth.esAdmin">
     
