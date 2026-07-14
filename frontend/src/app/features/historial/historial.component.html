@@ -154,4 +154,13 @@
       </ng-container>
     </tbody>
   </table>
+  <div class="cargar-mas-container" *ngIf="!cargando && historial.length > 0 && !historialCompleto" style="text-align: center; margin: 25px 0;">
+    <button class="btn-secondary" (click)="cargarMas()" [disabled]="cargandoMas" style="padding: 10px 20px; font-weight: 500; cursor: pointer;">
+      {{ cargandoMas ? '⏳ Cargando más...' : 'Ver más antiguos 👇' }}
+    </button>
+  </div>
+
+  <div *ngIf="historialCompleto && historial.length > 0" style="text-align: center; margin: 25px 0; color: #64748b; font-size: 14px;">
+    No hay más análisis antiguos para mostrar.
+  </div>
 </div>

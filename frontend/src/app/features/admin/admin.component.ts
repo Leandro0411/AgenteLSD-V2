@@ -23,6 +23,9 @@ export class AdminComponent implements OnInit {
   tickets: any[]    = [];
   ticketsCargando   = false;
 
+  // Filtro de estado
+  filtroEstadoTicket: 'todos' | 'abierto' | 'cerrado' = 'todos';
+
   subTabTickets: 'soporte' | 'ratings' = 'soporte';
 
   // ── Respuestas a Tickets ──────────────────────────────────────────────────
@@ -93,6 +96,12 @@ export class AdminComponent implements OnInit {
 
   get ticketsDeSoporte() {
     return this.tickets.filter(t => t.tipo === 'ticket');
+  }
+
+  get ticketsDeSoporteFiltrados() {
+    return this.ticketsDeSoporte.filter(t => 
+      this.filtroEstadoTicket === 'todos' || t.estado === this.filtroEstadoTicket
+    );
   }
 
   get ticketsDeRating() {

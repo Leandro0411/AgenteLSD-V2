@@ -38,8 +38,13 @@ export class LayoutComponent {
     this.mensajeGlobal = '';
     this.cargandoGlobal = true;
 
-    // Llama al backend (BACK_route_chat.js) usando el servicio
-    this.lsd.chat(this.mensajesGlobales).subscribe({
+    // Leemos la memoria caché del servicio LsdService
+    const sessionId = (this.lsd as any).ultimaSessionIdCache || '';
+    const informe = (this.lsd as any).ultimoInformeCache || null;
+    const archivo = (this.lsd as any).ultimoArchivoCache || '';
+
+    // Le pasamos los 4 parámetros al backend
+    this.lsd.chat(this.mensajesGlobales, sessionId, informe, archivo).subscribe({
       next: (res) => {
         this.mensajesGlobales.push({ role: 'assistant', content: res.respuesta });
         this.cargandoGlobal = false;

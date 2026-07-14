@@ -134,6 +134,40 @@ router.get('/:ticketId/archivo-original', verificarToken, soloAdmin, async (req,
   }
 });
 
+// ── GET /api/tickets/:ticketId/preview (SOLO ADMIN) ───────────────────────────
+router.get('/:ticketId/archivo-original/preview', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ ticketId: req.params.ticketId });
+    if (!ticket || !ticket.sessionId) {
+      return res.status(404).json({ ok: false, error: 'El ticket no tiene un archivo original asociado.' });
+    }
+
+    const ruta = path.join(ORIGINALES_DIR, `${ticket.sessionId}.txt`);
+    if (!fs.existsSync(ruta)) {
+      return res.status(404).json({ ok: false, error: 'El archivo TXT original ya no se encuentra en el servidor.' });
+    }
+
+    // Leemos el archivo y lo separamos por líneas
+    const rawText = fs.readFileSync(ruta, 'utf-8');
+    const lineas = rawText.split(/\r?\n/);
+    const totalLineas = lineas.length;
+    
+    // Topeamos en 500 líneas para no colgar el navegador del administrador si el archivo es gigante
+    const maxLineas = 500;
+    const truncado = totalLineas > maxLineas;
+    const contenido = truncado ? lineas.slice(0, maxLineas).join('\n') : rawText;
+
+    return res.json({
+      ok: true,
+      contenido,
+      nombreArchivo: ticket.archivo || 'original.txt',
+      totalLineas,
+      truncado
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // ── GET /api/tickets/:ticketId/archivo-respuesta/:index ───────────────────────
 router.get('/:ticketId/archivo-respuesta/:index', verificarToken, async (req, res) => {

@@ -68,12 +68,21 @@
       </div>
     </div>
 
+    <div *ngIf="!ticketsCargando && subTabTickets === 'soporte'" class="filtros-tickets" style="margin-bottom: 15px;">
+      <label style="margin-right: 10px; font-weight: 500; font-size: 14px;">Filtrar por estado:</label>
+      <select [(ngModel)]="filtroEstadoTicket" style="padding: 6px; border-radius: 6px; border: 1px solid #CBD5E1;">
+        <option value="todos">Todos los tickets</option>
+        <option value="abierto">🔴 Sin solución (Abiertos)</option>
+        <option value="cerrado">✅ Resueltos (Cerrados)</option>
+      </select>
+    </div>
+
     <p *ngIf="ticketsCargando" class="loading-msg">⏳ Cargando información...</p>
 
     <div *ngIf="!ticketsCargando && subTabTickets === 'soporte'" class="tickets-container">
       <div *ngIf="ticketsDeSoporte.length === 0" class="empty-state">No hay tickets de soporte registrados.</div>
       
-      <div *ngFor="let t of ticketsDeSoporte" class="ticket-card" [ngClass]="t.estado" [id]="'ticket-' + t.ticketId">
+      <div *ngFor="let t of ticketsDeSoporteFiltrados" class="ticket-card" [ngClass]="t.estado" [id]="'ticket-' + t.ticketId">
         <div class="ticket-header">
           <span class="ticket-user">👤 {{ t.username }}</span>
           <span class="ticket-fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>

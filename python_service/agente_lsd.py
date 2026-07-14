@@ -932,15 +932,15 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         # Base 4 cero con Base 10 con valor (Bug C / Guía 45)
         if base4 == 0 and base10 not in (None, 0):
             _add_issue(issues, "LSD-REG04-BASE-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base4": reg.get("base4_raw", ""), "base10": reg.get("base10_raw", "")})
+                       detalle={"base4": str(base4), "base10": str(base10)})
 
         # Base 1 > Rem Bruta
         if rem == 0 and base1 and base1 > 0:
             _add_issue(issues, "LSD-REG04-REM-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"rem_bruta": reg.get("rem_bruta_raw", ""), "base1": reg.get("base1_raw", ""), "problema": "rem_bruta_cero_base1_con_valor"})
+                       detalle={"rem_bruta": str(rem), "base1": str(base1), "problema": "rem_bruta_cero_base1_con_valor"})
         elif rem and base1 and base1 > rem:
             _add_issue(issues, "LSD-REG04-REM-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"rem_bruta": reg.get("rem_bruta_raw", ""), "base1": reg.get("base1_raw", ""), "problema": "base1_supera_rem_bruta"})
+                       detalle={"rem_bruta": str(rem), "base1": str(base1), "problema": "base1_supera_rem_bruta"})
 
         # Coherencia Base10 = Base2 - Detracción
         if base2 is not None and base10 is not None and importe_detraer is not None and importe_detraer > Decimal("0"):
@@ -949,24 +949,24 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                 _add_issue(issues, "LSD-REG04-DETRACCION-001", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"base": "10", "informado": str(base10), "determinado": str(base10_esperada),
                                     "diferencia": str(base10 - base10_esperada),
-                                    "base2": reg.get("base2_raw", ""), "importe_detraer": reg.get("importe_detraer_raw", "")})
+                                    "base2": str(base2), "importe_detraer": str(importe_detraer)})
 
         # Rem10 sin detracción (Bug K)
         if importe_detraer is not None and base10 is not None:
             if importe_detraer == Decimal("0") and base10 > Decimal("0"):
                 _add_issue(issues, "LSD-REG04-REM10-001", linea=reg["linea"], cuil=reg["cuil"],
-                           detalle={"importe_detraer": reg.get("importe_detraer_raw", ""), "rem10": reg.get("base10_raw", "")})
+                           detalle={"importe_detraer": str(importe_detraer), "rem10": str(base10)})
 
         # Base 4 ≠ Base 5
         if base4 is not None and base5 is not None and abs(base4 - base5) > Decimal("0.05"):
             _add_issue(issues, "LSD-REG04-BASE4-BASE5-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base4": reg.get("base4_raw", ""), "base5": reg.get("base5_raw", ""),
+                       detalle={"base4": str(base4), "base5": str(base5),
                                 "diferencia": str(abs(base4 - base5))})
 
         # Base 9 > Base 2
         if base9 is not None and base2 is not None and base9 > base2 + Decimal("0.05"):
             _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base9": reg.get("base9_raw", ""), "base2": reg.get("base2_raw", "")})
+                       detalle={"base9": str(base9), "base2": str(base2)})
 
         # Base 9 = Base 2 con Base 1 < Base 2 (tope inconsistente)
         tolerancia = Decimal("0.01")
@@ -980,7 +980,7 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         # Base 2 = 0 con Base 4 > 0
         if base2 is not None and base2 == 0 and base4 is not None and base4 > 0:
             _add_issue(issues, "LSD-REG04-BASE2-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base2": reg.get("base2_raw", ""), "base4": reg.get("base4_raw", "")})
+                       detalle={"base2": str(base2), "base4": str(base4)})
 
         # Base 9 inflada por concepto 0577
         if base1 is not None and base9 is not None and concepto_0577 > Decimal("0") and base9 > base1:

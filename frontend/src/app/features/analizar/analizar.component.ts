@@ -288,7 +288,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
     if (!this.estrellasRating) return; 
     
     this.ratingEnviando = true;
-    this.lsd.enviarFeedbackOTicket(this.nombreArchivo, 'rating', this.comentarioRating, this.estrellasRating)
+    this.lsd.enviarFeedbackOTicket(this.nombreArchivo, 'rating', this.comentarioRating, this.estrellasRating, this.sessionId)
       .subscribe({
         next: () => {
           this.ratingEnviado = true;
@@ -306,7 +306,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
     if (!this.mensajeTicket.trim()) return;
     
     this.ticketEnviando = true;
-    this.lsd.enviarFeedbackOTicket(this.nombreArchivo, 'ticket', this.mensajeTicket, 0)
+    this.lsd.enviarFeedbackOTicket(this.nombreArchivo, 'ticket', this.mensajeTicket, 0, this.sessionId)
       .subscribe({
         next: () => {
           this.ticketEnviado = true;

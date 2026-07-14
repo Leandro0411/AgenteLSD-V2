@@ -7,17 +7,22 @@
 /* ── Variables ─────────────────────────────────────────────────────────────── */
 :root {
   /* Paleta e-Sueldos */
-  --blue-900:   #0F2D6E;
-  --blue-700:   #1A4BAF;
-  --blue-600:   #1A56DB;   /* azul principal */
-  --blue-500:   #2563EB;
-  --blue-100:   #DBEAFE;
-  --blue-50:    #EFF6FF;
+  --blue-900:   #0B1B3D;   /* Azul ultra oscuro para textos fuertes */
+  --blue-700:   #003ECC;
+  --blue-600:   #0052FF;   /* Azul eléctrico principal (Landing) */
+  --blue-500:   #3377FF;
+  --blue-100:   #E5EDFF;
+  --blue-50:    #F0F4FF;
+
+  /* Acento e-Sueldos */
+  --coral-600:  #E63838;
+  --coral-500:  #FF4444;   /* Coral llamativo para botones */
+  --coral-100:  #FFE5E5;
 
   /* Fondos */
-  --bg:         #F3F4F8;   /* fondo general gris claro */
-  --bg-card:    #FFFFFF;   /* tarjetas blancas */
-  --bg-sidebar: #0F2D6E;   /* sidebar azul oscuro */
+  --bg:         #F4F7F9;   /* Fondo gris apenas azulado y limpio */
+  --bg-card:    #FFFFFF;   /* Tarjetas blancas */
+  --bg-sidebar: #102142;   /* Azul marino oscuro y elegante para el menú */
 
   /* Bordes y texto */
   --border:     #E5E7EB;
@@ -33,11 +38,11 @@
   --danger:     #DC2626;
   --danger-bg:  #FEF2F2;
 
-  --radius:     10px;
-  --radius-sm:  7px;
-  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
-  --shadow-sm:  0 1px 2px rgba(0,0,0,.06);
-  --transition: .18s ease;
+  --radius:     12px;      /* Bordes un poco más redondeados y modernos */
+  --radius-sm:  8px;
+  --shadow:     0 10px 25px rgba(0,82,255,.08);
+  --shadow-sm:  0 2px 8px rgba(0,0,0,.04);
+  --transition: .2s ease;
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -126,19 +131,19 @@ input, textarea, select { font-family: inherit; color: var(--text); }
 
 /* ─── BOTONES ─────────────────────────────────────────────────────────────── */
 .btn-primary {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 20px; border-radius: var(--radius-sm);
-  background: var(--blue-600); color: #fff; border: none;
-  font-weight: 600; font-size: 14px;
-  box-shadow: 0 1px 3px rgba(26,86,219,.3);
-  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+  padding: 10px 22px; border-radius: 100px; /* Botones tipo píldora como en la web */
+  background: var(--coral-500); color: #fff; border: none;
+  font-weight: 600; font-size: 14px; letter-spacing: 0.3px;
+  box-shadow: 0 4px 14px rgba(255, 68, 68, 0.3);
+  transition: all var(--transition);
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--blue-700); transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(26,86,219,.35);
+  background: var(--coral-600); transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
 }
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-primary.btn-lg   { padding: 12px 28px; font-size: 15px; }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-primary.btn-lg   { padding: 12px 30px; font-size: 15px; }
 
 .btn-secondary {
   display: inline-flex; align-items: center; gap: 7px;

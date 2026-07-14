@@ -281,13 +281,18 @@ router.get('/historial', verificarToken, soloAdmin, async (req, res) => {
 // GET /api/admin/historial/usuario — Historial del propio usuario (cualquier rol)
 router.get('/historial/mio', verificarToken, async (req, res) => {
   try {
-    const historial = await HistorialAnalisis.find({
-      username: req.usuario.username,
-      completado: true,
-    })
-      .select('sessionId nombreArchivo veredicto estadisticas fechaAnalisis modo_analisis')
-      .sort({ fechaAnalisis: -1 })
-      .limit(50);
+    // 👇 Agregamos lectura del límite (por defecto 10)
+    const limite = parseInt(req.query.limite) || 10;
+
+    let query = HistorialAnalisis.find({ username: req.usuario.username })
+                                 .sort({ creadoEn: -1, _id: -1 });
+
+    // 👇 Si hay límite, lo aplicamos a MongoDB
+    if (limite > 0) {
+      query = query.limit(limite);
+    }
+
+    const historial = await query.exec();
     return res.json({ ok: true, historial });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });

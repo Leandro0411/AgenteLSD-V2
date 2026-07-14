@@ -110,7 +110,7 @@ export class LsdService {
   }
 
   // ── Historial del usuario actual ────────────────────────────────────────────
-  getHistorialMio(): Observable<{ ok: boolean; historial: any[] }> {
-    return this.http.get<any>(`${this.API}/admin/historial/mio`);
+  getHistorialMio(limite: number = 10): Observable<{ ok: boolean; historial: any[] }> {
+    return this.http.get<any>(`${this.API}/admin/historial/mio?limite=${limite}`);
   }
 }

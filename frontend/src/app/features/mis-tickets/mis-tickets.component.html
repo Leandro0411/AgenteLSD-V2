@@ -5,13 +5,22 @@
   </div>
 
   <div *ngIf="cargando" class="loading">Cargando tickets...</div>
+
+  <div class="filtros-tickets" style="margin-bottom: 15px;">
+      <label style="margin-right: 10px; font-weight: 500; font-size: 14px;">Filtrar por estado:</label>
+      <select [(ngModel)]="filtroEstado" style="padding: 6px; border-radius: 6px; border: 1px solid #CBD5E1;">
+        <option value="todos">Todos mis tickets</option>
+        <option value="abierto">🔴 Sin solución (Abiertos)</option>
+        <option value="cerrado">✅ Resueltos (Cerrados)</option>
+      </select>
+    </div>
   
   <div *ngIf="!cargando && tickets.length === 0" class="empty-state">
     No tenés tickets de soporte abiertos ni en el historial.
   </div>
 
   <div class="tickets-list">
-    <div *ngFor="let t of tickets" class="ticket-card" [ngClass]="t.estado">
+    <div *ngFor="let t of ticketsFiltrados" class="ticket-card" [ngClass]="t.estado">
       <div class="ticket-header">
         <span class="badge" [ngClass]="t.estado">{{ t.estado === 'abierto' ? '⏳ Abierto' : '✅ Cerrado' }}</span>
         <span class="fecha">{{ t.creadoEn | date:'dd/MM/yyyy HH:mm' }}</span>

@@ -9,6 +9,7 @@ import { LsdService } from '../../core/services/lsd.service';
 export class MisTicketsComponent implements OnInit {
   tickets: any[] = [];
   cargando = true;
+  filtroEstado: 'todos' | 'abierto' | 'cerrado' = 'todos';
 
   constructor(private lsd: LsdService) {}
 
@@ -20,6 +21,12 @@ export class MisTicketsComponent implements OnInit {
       },
       error: () => this.cargando = false
     });
+  }
+
+  get ticketsFiltrados() {
+    return this.tickets.filter(t => 
+      this.filtroEstado === 'todos' || t.estado === this.filtroEstado
+    );
   }
 
   descargarArchivo(ticketId: string, index: number, nombre: string): void {
