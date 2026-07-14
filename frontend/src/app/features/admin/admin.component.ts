@@ -2,7 +2,7 @@
 import { Component, OnInit } from '@angular/core';
 import { AdminService } from '../../core/services/admin.service';
 
-type AdminTab = 'usuarios' | 'tickets' | 'normativas' | 'historial' | 'conocimiento';
+
 
 @Component({
   selector: 'app-admin',
@@ -78,8 +78,7 @@ export class AdminComponent implements OnInit {
     return this.tickets.filter(t => t.tipo === 'rating');
   }
 
-  // ── Normativas ───────────────────────────────────────────────────────────────
-  normativas: any[] = [];
+  // ── Normativas (solo estado para upload, la lista va a Conocimiento) ───────────────
   pdfSeleccionado: File | null = null;
   normativaCargando = false;
   normativaMsg      = '';
@@ -107,12 +106,11 @@ export class AdminComponent implements OnInit {
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
-  cambiarTab(tab: AdminTab): void {
+  cambiarTab(tab: string): void {
     this.tabActiva = tab;
-    if (tab === 'tickets'      && !this.tickets.length)    this.cargarTickets();
-    if (tab === 'normativas'   && !this.normativas.length) this.cargarNormativas();
-    if (tab === 'historial'    && !this.historial.length)  this.cargarHistorial();
-    if (tab === 'conocimiento' && !this.reglas.length)     this.cargarReglas();
+    if (tab === 'tickets'      && !this.tickets.length)  this.cargarTickets();
+    if (tab === 'historial'    && !this.historial.length) this.cargarHistorial();
+    if (tab === 'conocimiento' && !this.reglas.length)   this.cargarReglas();
   }
 
   // ── Usuarios ────────────────────────────────────────────────────────────────
@@ -158,12 +156,8 @@ export class AdminComponent implements OnInit {
     this.admin.cerrarTicket(ticketId).subscribe({ next: () => this.cargarTickets() });
   }
 
-  // ── Normativas ───────────────────────────────────────────────────────────────
-  cargarNormativas(): void {
-    this.admin.getNormativas().subscribe({ next: (r) => (this.normativas = r.pdfs || []) });
-  }
 
-  // ── Drag & Drop Normativas ──────────────────────────────────────────────────
+  // ── Drag & Drop PDF ──────────────────────────────────────────────────────────
   onDragOverNormativa(e: DragEvent): void { 
     e.preventDefault(); 
     this.dragOverNormativa = true;  
@@ -203,8 +197,7 @@ export class AdminComponent implements OnInit {
         this.normativaMsg      = r.mensaje;
         this.normativaCargando = false;
         this.pdfSeleccionado   = null;
-        this.cargarNormativas();
-        this.cargarReglas(1); // recargar reglas para mostrar las nuevas en el tab Conocimiento
+        this.cargarReglas(1);
       },
       error: (err) => {
         this.normativaMsg      = err.error?.error || 'Error subiendo el PDF.';
