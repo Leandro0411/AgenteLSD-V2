@@ -1,4 +1,3 @@
-// src/app/features/login/login.component.ts
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,6 +12,9 @@ export class LoginComponent {
   form: FormGroup;
   cargando = false;
   error    = '';
+  
+  // 👇 NUEVO: Variable para alternar la pantalla
+  modo: 'login' | 'registro' = 'login'; 
 
   constructor(private fb: FormBuilder, private auth: AuthService, private router: Router) {
     this.form = this.fb.group({
@@ -21,18 +23,37 @@ export class LoginComponent {
     });
   }
 
+  // 👇 NUEVO: Función para cambiar de modo
+  toggleModo(): void {
+    this.modo = this.modo === 'login' ? 'registro' : 'login';
+    this.error = '';
+    this.form.reset();
+  }
+
   onSubmit(): void {
     if (this.form.invalid) return;
     this.cargando = true;
     this.error    = '';
 
     const { username, password } = this.form.value;
-    this.auth.login(username, password).subscribe({
-      next:  () => this.router.navigate(['/analizar']),
-      error: (err) => {
-        this.error    = err.error?.error || 'Credenciales incorrectas.';
-        this.cargando = false;
-      },
-    });
+
+    if (this.modo === 'login') {
+      this.auth.login(username, password).subscribe({
+        next:  () => this.router.navigate(['/analizar']),
+        error: (err) => {
+          this.error    = err.error?.error || 'Credenciales incorrectas.';
+          this.cargando = false;
+        },
+      });
+    } else {
+      // Si está en modo registro, llama a la función nueva
+      this.auth.registro(username, password).subscribe({
+        next:  () => this.router.navigate(['/analizar']),
+        error: (err) => {
+          this.error    = err.error?.error || 'Error al crear la cuenta.';
+          this.cargando = false;
+        },
+      });
+    }
   }
 }

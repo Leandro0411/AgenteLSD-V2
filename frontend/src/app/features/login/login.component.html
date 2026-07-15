@@ -1,13 +1,12 @@
-<!-- src/app/features/login/login.component.html -->
 <div class="login-page">
   <div class="login-card">
     <div class="login-logo">
-      <div style="background:#0F2D6E; border-radius:14px; padding:10px; display:inline-flex; margin-bottom:10px;">
-        <img src="assets/logo-esueldos.png"
-             alt="e-Sueldos" style="height:52px; width:auto; object-fit:contain;">
+      <div style="background:var(--blue-900); border-radius:14px; padding:10px; display:inline-flex; margin-bottom:10px;">
+        <img src="assets/logo-esueldos.png" alt="e-Sueldos" style="height:52px; width:auto; object-fit:contain;">
       </div>
-      <h1>Agente LSD</h1>
-      <p class="subtitle">Validador de Libro de Sueldo Digital &mdash; <strong>e-Sueldos</strong></p>
+      <h1>{{ modo === 'login' ? 'Agente LSD' : 'Crear Cuenta' }}</h1>
+      <p class="subtitle" *ngIf="modo === 'login'">Validador de Libro de Sueldo Digital &mdash; <strong>e-Sueldos</strong></p>
+      <p class="subtitle" *ngIf="modo === 'registro'">Unite al ecosistema de IA de <strong>e-Sueldos</strong></p>
     </div>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" id="login-form">
@@ -17,11 +16,11 @@
           id="username"
           type="text"
           formControlName="username"
-          placeholder="Ingresá tu usuario"
+          placeholder="Elegí tu nombre de usuario"
           autocomplete="username"
         />
         <span class="field-error" *ngIf="form.get('username')?.invalid && form.get('username')?.touched">
-          El usuario es requerido.
+          El usuario debe tener al menos 3 caracteres.
         </span>
       </div>
 
@@ -35,7 +34,7 @@
           autocomplete="current-password"
         />
         <span class="field-error" *ngIf="form.get('password')?.invalid && form.get('password')?.touched">
-          La contraseña es requerida.
+          La contraseña debe tener al menos 4 caracteres.
         </span>
       </div>
 
@@ -49,10 +48,17 @@
         class="btn-primary"
         [disabled]="cargando || form.invalid"
       >
-        <span *ngIf="!cargando">Ingresar</span>
-        <span *ngIf="cargando" class="spinner">Ingresando...</span>
+        <span *ngIf="!cargando">{{ modo === 'login' ? 'Ingresar' : 'Registrarme' }}</span>
+        <span *ngIf="cargando" class="spinner">{{ modo === 'login' ? 'Ingresando...' : 'Creando cuenta...' }}</span>
       </button>
     </form>
+
+    <div style="text-align: center; margin-top: 22px; font-size: 13.5px; color: var(--text-muted);">
+      {{ modo === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés una cuenta?' }}
+      <a href="javascript:void(0)" (click)="toggleModo()" style="color: var(--blue-600); font-weight: 600; transition: color 0.2s;">
+        {{ modo === 'login' ? 'Registrate acá' : 'Iniciá sesión' }}
+      </a>
+    </div>
 
     <p class="footer-note">e-Sueldos · Sistema interno</p>
   </div>

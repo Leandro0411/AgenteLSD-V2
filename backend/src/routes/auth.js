@@ -40,6 +40,46 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ── POST /api/auth/register ───────────────────────────────────────────────────
+router.post('/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, error: 'Usuario y contraseña requeridos.' });
+  }
+
+  try {
+    // 1. Verificamos si el usuario ya existe
+    const existe = await Usuario.findOne({ username: username.trim().toLowerCase() });
+    if (existe) {
+      return res.status(400).json({ ok: false, error: 'Ese nombre de usuario ya está en uso.' });
+    }
+
+    // 2. Creamos el usuario (asumimos que tu modelo Usuario encripta la password antes de guardar)
+    const nuevoUsuario = await Usuario.create({
+      username: username.trim().toLowerCase(),
+      passwordHash: password,
+      rol: 'usuario' // Por defecto le damos el rol base
+    });
+
+    // 3. Generamos el token para loguearlo automáticamente
+    const token = jwt.sign(
+      { id: nuevoUsuario._id, username: nuevoUsuario.username, rol: nuevoUsuario.rol },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
+    );
+
+    return res.json({
+      ok: true,
+      token,
+      usuario: { username: nuevoUsuario.username, rol: nuevoUsuario.rol },
+    });
+  } catch (err) {
+    console.error('[auth] Error en registro:', err);
+    return res.status(500).json({ ok: false, error: 'Error interno al crear la cuenta.' });
+  }
+});
+
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
 // Devuelve datos del usuario autenticado (útil para Angular al recargar la app)
 router.get('/me', verificarToken, async (req, res) => {

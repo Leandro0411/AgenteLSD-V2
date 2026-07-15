@@ -57,6 +57,16 @@ export class AuthService {
     );
   }
 
+  registro(username: string, password: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.API}/register`, { username, password }).pipe(
+      tap((res) => {
+        // Guardamos la sesión exactamente igual que en el login
+        this._token = res.token;
+        this._usuario$.next(res.usuario);
+      })
+    );
+  }
+
   logout(): void {
     this._token = null;
     this._usuario$.next(null);
