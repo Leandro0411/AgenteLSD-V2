@@ -84,6 +84,10 @@ export class AdminService {
     return this.http.get<any>(`${this.API}/admin/historial`);
   }
 
+  getEstadisticas() {
+    return this.http.get<any>(`${this.API}/admin/estadisticas`);
+  }
+
   // ── Base de Conocimiento (Reglas) ──────────────────────────────────────────
   getReglas(page = 1, limit = 50): Observable<{ ok: boolean; reglas: any[]; total: number; page: number; pages: number }> {
     return this.http.get<any>(`${this.API}/admin/reglas?page=${page}&limit=${limit}`);
@@ -100,6 +104,12 @@ export class AdminService {
   eliminarRegla(id: string): Observable<any> {
     return this.http.delete<any>(`${this.API}/admin/reglas/${id}`);
   }
+
+  // ── Motor Visual de Reglas ──────────────────────────────────────────────────
+  getMotorReglas() { return this.http.get<any>(`${this.API}/admin/motor-reglas`); }
+  crearMotorRegla(regla: any) { return this.http.post<any>(`${this.API}/admin/motor-reglas`, regla); }
+  toggleMotorRegla(id: string, activa: boolean) { return this.http.put<any>(`${this.API}/admin/motor-reglas/${id}/toggle`, { activa }); }
+  eliminarMotorRegla(id: string) { return this.http.delete<any>(`${this.API}/admin/motor-reglas/${id}`); }
 
   // ── Health ─────────────────────────────────────────────────────────────────
   getHealth(): Observable<any> {

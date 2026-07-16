@@ -385,6 +385,22 @@ def _cargar_reglas_personalizadas():
 _cargar_reglas_personalizadas()
 
 # ---------------------------------------------------------------------------
+# CARGA DE REGLAS DINÁMICAS (Desde MongoDB vía Node.js)
+# ---------------------------------------------------------------------------
+DYN_RULES_FILE = os.path.join(os.path.dirname(__file__), "reglas_dinamicas.json")
+
+def _cargar_reglas_dinamicas() -> list:
+    if os.path.exists(DYN_RULES_FILE):
+        try:
+            with open(DYN_RULES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+REGLAS_DINAMICAS = _cargar_reglas_dinamicas()
+
+# ---------------------------------------------------------------------------
 # HELPERS DE PARSEO
 # ---------------------------------------------------------------------------
 
@@ -909,17 +925,22 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                        detalle={"base": "9", "informado": str(base9), "determinado": str(base9 - suma_erronea),
                                 "diferencia": str(suma_erronea), "legajo": legajo})
 
-        # Tope proporcional SAC guillotinado
+        # Tope proporcional SAC guillotinado (CORREGIDO)
         if base1 is not None and base1 > Decimal("1000000.00"):
             for concepto in conceptos:
                 imp_con  = concepto.get("importe", Decimal("0"))
                 cant_raw = concepto.get("cantidad", "0")
-                if imp_con > Decimal("100000.00") and cant_raw.isdigit():
-                    dias = Decimal(cant_raw) / Decimal("100")
-                    if Decimal("0") < dias <= Decimal("15"):
-                        _add_issue(issues, "LSD-REG04-TOPE-MOPRE-SAC", linea=reg["linea"], cuil=reg["cuil"],
-                                   detalle={"base1_informada": str(base1), "importe_sac": str(imp_con), "dias_informados": str(dias)})
-                        break
+                cod_arca = concepto.get("codigo_arca", "")
+                deb_cred = concepto.get("debito_credito", "C")
+                
+                # SOLO validamos si es un Crédito (C) y si el código ARCA pertenece a la familia SAC (120xxx)
+                if deb_cred == "C" and cod_arca.startswith("120"):
+                    if imp_con > Decimal("100000.00") and cant_raw.isdigit():
+                        dias = Decimal(cant_raw) / Decimal("100")
+                        if Decimal("0") < dias <= Decimal("15"):
+                            _add_issue(issues, "LSD-REG04-TOPE-MOPRE-SAC", linea=reg["linea"], cuil=reg["cuil"],
+                                       detalle={"base1_informada": str(base1), "importe_sac": str(imp_con), "dias_informados": str(dias)})
+                            break
 
         # Bases negativas
         for campo in ("base1", "base2", "base3", "base4", "base5", "base6", "base7", "base8",
@@ -1024,6 +1045,49 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             if 1200000 <= cod_int <= 1299999 and cod != "1200030":
                 _add_issue(issues, "LSD-REG03-SAC-001", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"concepto": cod, "mes": periodo_mes})
+
+
+    # ── Evaluador de Reglas Dinámicas (Visual Rule Manager) ──────────────────
+    for dyn in REGLAS_DINAMICAS:
+        if not dyn.get("activa", True):
+            continue
+
+        rule_id = f"DYN-{dyn.get('_id', '000')}"
+        
+        # Inyectamos la regla al catálogo en memoria para que se dibuje bien en Angular
+        if rule_id not in RULE_CATALOG:
+            RULE_CATALOG[rule_id] = {
+                "severidad": dyn.get("severidad", "ADVERTENCIA"),
+                "campo": dyn.get("campo", "Personalizado"),
+                "mensaje": dyn.get("mensaje", "Inconsistencia detectada por regla visual."),
+                "causa": "Regla de validación dinámica creada por el administrador.",
+                "fix_hint": "Revisar los parámetros de la liquidación según la nueva normativa."
+            }
+
+        target = dyn.get("registroTarget")
+        # Recorremos solo los registros a los que apunta la regla (ej: todos los "03")
+        for reg in by_type.get(target, []):
+            val = reg.get(dyn.get("campo"))
+            op  = dyn.get("operador")
+            ref = dyn.get("valor")
+
+            if val is None:
+                continue
+
+            match = False
+            try:
+                # Evaluaciones lógicas
+                if op == "==": match = str(val).strip() == str(ref).strip()
+                elif op == "!=": match = str(val).strip() != str(ref).strip()
+                elif op == ">": match = float(val) > float(ref)
+                elif op == "<": match = float(val) < float(ref)
+                elif op == "contiene": match = str(ref).lower() in str(val).lower()
+            except ValueError:
+                pass # Si el usuario comparó letras con ">", ignoramos para que no falle
+
+            if match:
+                _add_issue(issues, rule_id, linea=reg["linea"], cuil=reg.get("cuil"), 
+                           detalle={"valor_encontrado": str(val), "regla": dyn})
 
     return issues
 

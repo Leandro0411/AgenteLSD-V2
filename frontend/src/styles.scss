@@ -6,42 +6,42 @@
 
 /* ── Variables ─────────────────────────────────────────────────────────────── */
 :root {
-  /* Paleta e-Sueldos */
-  --blue-900:   #0B1B3D;   /* Azul ultra oscuro para textos fuertes */
-  --blue-700:   #003ECC;
-  --blue-600:   #0052FF;   /* Azul eléctrico principal (Landing) */
+  /* Paleta Oficial e-Sueldos */
+  --blue-900:   #0A1B3F;   /* Azul re oscuro para textos fuertes */
+  --blue-800:   #0033B3;
+  --blue-600:   #0055FF;   /* AZUL VIBRANTE E-SUELDOS (Fondo de la web) */
   --blue-500:   #3377FF;
-  --blue-100:   #E5EDFF;
-  --blue-50:    #F0F4FF;
+  --blue-100:   #E6EFFF;
+  --blue-50:    #F2F6FF;
 
-  /* Acento e-Sueldos */
-  --coral-600:  #E63838;
-  --coral-500:  #FF4444;   /* Coral llamativo para botones */
+  /* Acento e-Sueldos (Rojo del botón "Ingresar") */
+  --coral-600:  #E63535;
+  --coral-500:  #FF4B4B;   /* Rojo coral brillante */
   --coral-100:  #FFE5E5;
 
   /* Fondos */
-  --bg:         #F4F7F9;   /* Fondo gris apenas azulado y limpio */
+  --bg:         #F8FAFC;   /* Fondo gris clarito, súper limpio */
   --bg-card:    #FFFFFF;   /* Tarjetas blancas */
-  --bg-sidebar: #102142;   /* Azul marino oscuro y elegante para el menú */
+  --bg-sidebar: #0055FF;   /* El menú lateral ahora es del azul de la Landing */
 
   /* Bordes y texto */
-  --border:     #E5E7EB;
-  --text:       #111827;
-  --text-muted: #6B7280;
-  --text-light: #9CA3AF;
+  --border:     #E2E8F0;
+  --text:       #1E293B;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
 
-  /* Semáforo */
-  --success:    #059669;
-  --success-bg: #ECFDF5;
-  --warning:    #D97706;
-  --warning-bg: #FFFBEB;
-  --danger:     #DC2626;
-  --danger-bg:  #FEF2F2;
+  /* Semáforo (Validaciones ARCA) */
+  --success:    #10B981;
+  --success-bg: #D1FAE5;
+  --warning:    #F59E0B;
+  --warning-bg: #FEF3C7;
+  --danger:     #EF4444;
+  --danger-bg:  #FEE2E2;
 
-  --radius:     12px;      /* Bordes un poco más redondeados y modernos */
+  --radius:     12px;      /* Bordes más suaves tipo app moderna */
   --radius-sm:  8px;
-  --shadow:     0 10px 25px rgba(0,82,255,.08);
-  --shadow-sm:  0 2px 8px rgba(0,0,0,.04);
+  --shadow:     0 10px 25px rgba(0, 85, 255, 0.15);
+  --shadow-sm:  0 2px 8px rgba(0, 0, 0, 0.05);
   --transition: .2s ease;
 }
 
@@ -132,15 +132,15 @@ input, textarea, select { font-family: inherit; color: var(--text); }
 /* ─── BOTONES ─────────────────────────────────────────────────────────────── */
 .btn-primary {
   display: inline-flex; align-items: center; gap: 8px; justify-content: center;
-  padding: 10px 22px; border-radius: 100px; /* Botones tipo píldora como en la web */
+  padding: 10px 24px; border-radius: 100px; /* Botones redondos tipo píldora */
   background: var(--coral-500); color: #fff; border: none;
-  font-weight: 600; font-size: 14px; letter-spacing: 0.3px;
-  box-shadow: 0 4px 14px rgba(255, 68, 68, 0.3);
+  font-weight: 600; font-size: 14.5px; letter-spacing: 0.2px;
+  box-shadow: 0 4px 14px rgba(255, 75, 75, 0.35);
   transition: all var(--transition);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--coral-600); transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
+  box-shadow: 0 6px 20px rgba(255, 75, 75, 0.45);
 }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-primary.btn-lg   { padding: 12px 30px; font-size: 15px; }

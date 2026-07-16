@@ -10,6 +10,7 @@ const HistorialAnalisis = require('../models/HistorialAnalisis');
 const { verificarToken, soloAdmin } = require('../middleware/auth');
 const NormativaQA      = require('../models/NormativaQA');
 const ReglaNormativa   = require('../models/ReglaNormativa');
+const ReglaValidacion = require('../models/ReglaValidacion');
 
 const router = express.Router();
 
@@ -278,6 +279,44 @@ router.get('/historial', verificarToken, soloAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/estadisticas — Dashboard de métricas globales (solo admin)
+router.get('/estadisticas', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    // 1. Calculamos los totales generales (KPIs)
+    const kpis = await HistorialAnalisis.aggregate([
+      { $match: { completado: true } },
+      { $group: {
+          _id: null,
+          totalArchivos: { $sum: 1 },
+          totalEmpleados: { $sum: "$estadisticas.total_empleados" },
+          totalErrores: { $sum: "$estadisticas.errores_criticos" }
+        }
+      }
+    ]);
+
+    // 2. Armamos el Top 5 de los errores más repetidos
+    const topErrores = await HistorialAnalisis.aggregate([
+      { $match: { completado: true } },
+      { $unwind: "$problemas" }, // Desarmamos el array de problemas de cada archivo
+      { $group: { 
+          _id: "$problemas.titulo", // Agrupamos por el título del error
+          cantidad: { $sum: 1 }     // Contamos cuántas veces apareció
+        } 
+      },
+      { $sort: { cantidad: -1 } },  // Ordenamos de mayor a menor
+      { $limit: 5 }                 // Nos quedamos con los 5 primeros
+    ]);
+
+    return res.json({
+      ok: true,
+      kpis: kpis[0] || { totalArchivos: 0, totalEmpleados: 0, totalErrores: 0 },
+      topErrores
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // GET /api/admin/historial/usuario — Historial del propio usuario (cualquier rol)
 router.get('/historial/mio', verificarToken, async (req, res) => {
   try {
@@ -308,6 +347,48 @@ router.get('/historial/mio-completo', verificarToken, async (req, res) => {
     }).sort({ fechaAnalisis: -1 }); // Trae todo, incluyendo el array de problemas
     
     return res.json({ ok: true, historial });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── MOTOR DE REGLAS VISUALES ──────────────────────────────────────────────────
+
+// GET /api/admin/motor-reglas
+router.get('/motor-reglas', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const reglas = await ReglaValidacion.find().sort({ createdAt: -1 });
+    return res.json({ ok: true, reglas });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/admin/motor-reglas
+router.post('/motor-reglas', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const regla = await ReglaValidacion.create(req.body);
+    return res.json({ ok: true, regla });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// PUT /api/admin/motor-reglas/:id/toggle
+router.put('/motor-reglas/:id/toggle', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const regla = await ReglaValidacion.findByIdAndUpdate(req.params.id, { activa: req.body.activa }, { new: true });
+    return res.json({ ok: true, regla });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/admin/motor-reglas/:id
+router.delete('/motor-reglas/:id', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    await ReglaValidacion.findByIdAndDelete(req.params.id);
+    return res.json({ ok: true, mensaje: 'Regla eliminada' });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }

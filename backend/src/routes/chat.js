@@ -663,6 +663,18 @@ ${JSON.stringify(contexto, null, 2)}`;
     const result = await chat.sendMessage(ultimoMensaje);
     const texto  = result.response.text() || 'No pude generar una respuesta.';
 
+    if (sessionId) {
+      try {
+        const conversacionActualizada = [...messages, { role: 'assistant', content: texto }];
+        await HistorialAnalisis.findOneAndUpdate(
+          { sessionId },
+          { chat: conversacionActualizada }
+        );
+      } catch (errDB) {
+        console.error('[chat] Error guardando historial de chat:', errDB.message);
+      }
+    }
+
     return res.json({ respuesta: texto });
   } catch (err) {
     console.error('[chat] Error Gemini:', err.message);

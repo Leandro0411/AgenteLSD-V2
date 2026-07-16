@@ -7,9 +7,83 @@
 
   <!-- Tabs -->
   <div class="admin-tabs">
+    <button [class.active]="tabActiva === 'dashboard'"    (click)="cambiarTab('dashboard')">📊 Dashboard</button>
     <button [class.active]="tabActiva === 'usuarios'"     (click)="cambiarTab('usuarios')"     id="admin-tab-usuarios">👥 Usuarios</button>
     <button [class.active]="tabActiva === 'tickets'"      (click)="cambiarTab('tickets')"      id="admin-tab-tickets">🎫 Feedback</button>
     <button [class.active]="tabActiva === 'conocimiento'" (click)="cambiarTab('conocimiento')" id="admin-tab-conocimiento">🧠 Conocimiento</button>
+    <button [class.active]="tabActiva === 'motor'" (click)="cambiarTab('motor')">⚙️ Reglas Visuales</button>
+  </div>
+
+  <!-- ── TAB: Dashboard ───────────────────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'dashboard'" class="tab-panel">
+    
+    <div *ngIf="estadisticasCargando" class="loading-msg" style="text-align: center; padding: 40px; color: var(--text-muted);">
+      ⏳ Calculando métricas en tiempo real...
+    </div>
+
+    <ng-container *ngIf="!estadisticasCargando && estadisticas">
+      
+      <!-- KPIs (Tarjetas) -->
+      <div class="panel-section">
+        <h2>Rendimiento Global</h2>
+        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+          
+          <div class="stat-card" style="border-top: 4px solid var(--blue-600); background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <span class="stat-label" style="color: var(--text-muted); font-size: 13px; font-weight: 600; text-transform: uppercase;">Archivos Analizados</span>
+            <span class="stat-num" style="display: block; font-size: 32px; font-weight: 800; color: var(--blue-900); margin-top: 8px;">
+              {{ estadisticas.kpis.totalArchivos | number }}
+            </span>
+          </div>
+
+          <div class="stat-card" style="border-top: 4px solid var(--success); background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <span class="stat-label" style="color: var(--text-muted); font-size: 13px; font-weight: 600; text-transform: uppercase;">Empleados Procesados</span>
+            <span class="stat-num" style="display: block; font-size: 32px; font-weight: 800; color: var(--blue-900); margin-top: 8px;">
+              {{ (estadisticas.kpis.totalEmpleados || 0) | number }}
+            </span>
+          </div>
+
+          <div class="stat-card" style="border-top: 4px solid var(--coral-500); background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <span class="stat-label" style="color: var(--text-muted); font-size: 13px; font-weight: 600; text-transform: uppercase;">Errores Detectados</span>
+            <span class="stat-num" style="display: block; font-size: 32px; font-weight: 800; color: var(--blue-900); margin-top: 8px;">
+              {{ (estadisticas.kpis.totalErrores || 0) | number }}
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Top 5 Errores -->
+      <div class="panel-section" style="margin-top: 30px;">
+        <h2>Top 5: Errores más frecuentes en ARCA</h2>
+        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid var(--border);">
+          <table class="admin-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background: var(--bg);">
+                <th style="padding: 15px; text-align: left; color: var(--text-muted);">Descripción del Error</th>
+                <th style="padding: 15px; text-align: center; color: var(--text-muted); width: 150px;">Apariciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let err of estadisticas.topErrores; let i = index" style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 15px;">
+                  <strong style="color: var(--blue-900); margin-right: 8px;">#{{ i + 1 }}</strong> 
+                  {{ err._id || 'Error sin clasificar' }}
+                </td>
+                <td style="padding: 15px; text-align: center; font-weight: 600; color: var(--coral-500);">
+                  {{ err.cantidad }} veces
+                </td>
+              </tr>
+              <tr *ngIf="estadisticas.topErrores?.length === 0">
+                <td colspan="2" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                  Todavía no se detectaron errores en la plataforma.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </ng-container>
   </div>
 
   <!-- ── TAB: Usuarios ────────────────────────────────────────────────────── -->
@@ -329,6 +403,104 @@
         </p>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ── TAB: Motor de Reglas Visuales ────────────────────────────────────── -->
+  <div *ngIf="tabActiva === 'motor'" class="tab-panel">
+    <div class="panel-section">
+      <div class="conocimiento-header">
+        <div>
+          <h2>⚙️ Motor de Validación Dinámico</h2>
+          <p class="conocimiento-sub">Creá reglas matemáticas sin tocar código. Python las procesará en tiempo real.</p>
+        </div>
+        <div class="conocimiento-actions">
+          <button class="btn-primary" (click)="mostrarFormMotor = !mostrarFormMotor">
+            {{ mostrarFormMotor ? '✕ Cancelar' : '+ Nueva Regla' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulario para crear regla visual -->
+      <div *ngIf="mostrarFormMotor" class="nueva-regla-form" style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--blue-100); margin-bottom: 20px;">
+        <h3 style="margin-bottom: 15px; color: var(--blue-900);">Configurar Regla Matemática</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr 2fr; gap: 15px; margin-bottom: 15px;">
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Registro Objetivo
+            <select [(ngModel)]="nuevaReglaVisual.registroTarget" style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+              <option value="01">REG01 - Cabecera</option>
+              <option value="02">REG02 - Empleado</option>
+              <option value="03">REG03 - Conceptos</option>
+              <option value="04">REG04 - Bases</option>
+            </select>
+          </label>
+          
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Campo (Variable de Python)
+            <input type="text" [(ngModel)]="nuevaReglaVisual.campo" placeholder="Ej: codigo_arca, base4, rem_bruta..." style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);" />
+          </label>
+
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Condición
+            <select [(ngModel)]="nuevaReglaVisual.operador" style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+              <option value="==">Es igual a</option>
+              <option value="!=">Es distinto a</option>
+              <option value=">">Es mayor que</option>
+              <option value="<">Es menor que</option>
+              <option value="contiene">Contiene</option>
+            </select>
+          </label>
+
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Valor
+            <input type="text" [(ngModel)]="nuevaReglaVisual.valor" placeholder="Ej: 560000, 100000, 0..." style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);" />
+          </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 3fr; gap: 15px; margin-bottom: 20px;">
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Severidad
+            <select [(ngModel)]="nuevaReglaVisual.severidad" style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+              <option value="ADVERTENCIA">⚠️ Advertencia</option>
+              <option value="CRITICO">❌ Crítico (Rechazo ARCA)</option>
+            </select>
+          </label>
+
+          <label style="display: flex; flex-direction: column; font-size: 13px; font-weight: 600;">Mensaje de Error para el Usuario
+            <input type="text" [(ngModel)]="nuevaReglaVisual.mensaje" placeholder="Ej: No podés usar este concepto obsoleto." style="margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);" />
+          </label>
+        </div>
+
+        <button class="btn-primary" (click)="crearReglaVisual()" [disabled]="motorCargando" style="width: 100%;">
+          {{ motorCargando ? 'Guardando...' : 'Guardar y Activar Regla' }}
+        </button>
+      </div>
+
+      <!-- Lista de Reglas Visuales -->
+      <div *ngIf="motorCargando && !mostrarFormMotor" class="loading-center">Cargando reglas...</div>
+
+      <div *ngIf="!motorCargando" class="reglas-lista">
+        <div *ngFor="let regla of reglasVisuales" class="regla-card" [class.inactiva]="!regla.activa" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: white; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border);">
+          
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="badge" [ngClass]="regla.severidad.toLowerCase()">{{ regla.severidad }}</span>
+              <strong style="font-size: 14px; font-family: monospace; background: var(--blue-50); color: var(--blue-600); padding: 4px 8px; border-radius: 6px;">
+                Si REG{{ regla.registroTarget }}.{{ regla.campo }} {{ regla.operador }} {{ regla.valor }}
+              </strong>
+            </div>
+            <span style="font-size: 14px; color: var(--text-muted);">{{ regla.mensaje }}</span>
+          </div>
+
+          <div class="regla-btns" style="display: flex; gap: 10px;">
+            <button class="btn-secondary-sm" (click)="toggleReglaVisual(regla)">
+              {{ regla.activa ? '⏸️ Desactivar' : '▶️ Activar' }}
+            </button>
+            <button class="btn-danger-sm" (click)="eliminarReglaVisual(regla._id)">🗑️ Borrar</button>
+          </div>
+
+        </div>
+
+        <div *ngIf="reglasVisuales.length === 0 && !mostrarFormMotor" class="empty-state">
+          No hay reglas visuales configuradas.
+        </div>
+      </div>
     </div>
   </div>
 

@@ -10,7 +10,11 @@ import { AdminService } from '../../core/services/admin.service';
   styleUrls: ['./admin.component.scss'],
 })
 export class AdminComponent implements OnInit {
-  tabActiva: string = 'usuarios';
+  tabActiva: string = 'dashboard';
+
+  // ── Dashboard ───────────────────────────────────────────────────────────────
+  estadisticas: any = null;
+  estadisticasCargando = false;
 
   // ── Usuarios ────────────────────────────────────────────────────────────────
   usuarios: any[]   = [];
@@ -28,10 +32,67 @@ export class AdminComponent implements OnInit {
 
   subTabTickets: 'soporte' | 'ratings' = 'soporte';
 
+  // ── Motor Visual de Reglas ──────────────────────────────────────────────────
+  reglasVisuales: any[] = [];
+  motorCargando = false;
+  mostrarFormMotor = false;
+  nuevaReglaVisual = {
+    registroTarget: '03',
+    campo: '',
+    operador: '==',
+    valor: '',
+    severidad: 'ADVERTENCIA',
+    mensaje: ''
+  };
+
+  cargarMotorReglas(): void {
+    this.motorCargando = true;
+    this.admin.getMotorReglas().subscribe({
+      next: (res) => {
+        this.reglasVisuales = res.reglas || [];
+        this.motorCargando = false;
+      },
+      error: () => this.motorCargando = false
+    });
+  }
+
+  crearReglaVisual(): void {
+    if (!this.nuevaReglaVisual.campo || !this.nuevaReglaVisual.valor || !this.nuevaReglaVisual.mensaje) return;
+    this.motorCargando = true;
+    this.admin.crearMotorRegla(this.nuevaReglaVisual).subscribe({
+      next: (res) => {
+        this.reglasVisuales.unshift(res.regla);
+        this.mostrarFormMotor = false;
+        this.motorCargando = false;
+        // Reseteamos el formulario
+        this.nuevaReglaVisual = { registroTarget: '03', campo: '', operador: '==', valor: '', severidad: 'ADVERTENCIA', mensaje: '' };
+      },
+      error: (err) => {
+        alert('Error: ' + (err.error?.error || 'No se pudo crear la regla'));
+        this.motorCargando = false;
+      }
+    });
+  }
+
+  toggleReglaVisual(regla: any): void {
+    const nuevoEstado = !regla.activa;
+    this.admin.toggleMotorRegla(regla._id, nuevoEstado).subscribe({
+      next: () => regla.activa = nuevoEstado
+    });
+  }
+
+  eliminarReglaVisual(id: string): void {
+    if (!confirm('¿Seguro que querés eliminar esta regla matemática?')) return;
+    this.admin.eliminarMotorRegla(id).subscribe({
+      next: () => this.reglasVisuales = this.reglasVisuales.filter((r) => r._id !== id)
+    });
+  }
+
   // ── Respuestas a Tickets ──────────────────────────────────────────────────
   textoRespuesta: { [id: string]: string } = {};
   archivoRespuesta: { [id: string]: File | null } = {};
   respondiendoTicket: { [id: string]: boolean } = {};
+
   // Preview del TXT original por ticket
   previewTxt:        Record<string, { contenido: string; nombreArchivo: string; totalLineas: number; truncado: boolean } | null> = {};
   previewCargando:   Record<string, boolean> = {};
@@ -133,14 +194,28 @@ export class AdminComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarUsuarios();
+    this.cargarEstadisticas();
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
   cambiarTab(tab: string): void {
     this.tabActiva = tab;
+    if (tab === 'dashboard'    && !this.estadisticas)  this.cargarEstadisticas();
     if (tab === 'tickets'      && !this.tickets.length)  this.cargarTickets();
     if (tab === 'historial'    && !this.historial.length) this.cargarHistorial();
     if (tab === 'conocimiento' && !this.reglas.length)   this.cargarReglas();
+    if (tab === 'motor' && !this.reglasVisuales.length) this.cargarMotorReglas();
+  }
+
+  cargarEstadisticas(): void {
+    this.estadisticasCargando = true;
+    this.admin.getEstadisticas().subscribe({
+      next: (r) => {
+        this.estadisticas = r;
+        this.estadisticasCargando = false;
+      },
+      error: () => this.estadisticasCargando = false
+    });
   }
 
   // ── Usuarios ────────────────────────────────────────────────────────────────

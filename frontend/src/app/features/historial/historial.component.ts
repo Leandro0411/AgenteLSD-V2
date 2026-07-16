@@ -52,6 +52,22 @@ export class HistorialComponent implements OnInit {
 
   toggleFila(index: number): void {
     this.filaExpandida = this.filaExpandida === index ? null : index;
+    if (this.filaExpandida !== null) {
+      const h = this.historial[index];
+      
+      // Actualizamos la caché del servicio
+      (this.lsd as any).ultimaSessionIdCache = h.sessionId;
+      (this.lsd as any).ultimoInformeCache = h;
+      (this.lsd as any).ultimoArchivoCache = h.nombreArchivo;
+
+      // Si tiene un chat guardado lo usamos, si no, le ponemos un mensaje de bienvenida
+      const mensajesHistoricos = h.chat && h.chat.length > 0 
+        ? h.chat 
+        : [{ role: 'assistant', content: `¡Hola! Estás viendo el archivo viejo "${h.nombreArchivo}". ¿Necesitás que te recuerde algo de este análisis?` }];
+
+      // Disparamos un evento global para que el Layout actualice el panel flotante al instante
+      document.dispatchEvent(new CustomEvent('cargar-chat-historico', { detail: mensajesHistoricos }));
+    }
   }
   
   /**

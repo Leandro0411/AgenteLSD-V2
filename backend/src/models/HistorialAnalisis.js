@@ -6,6 +6,7 @@ const historialSchema = new mongoose.Schema(
     sessionId: { type: String, required: true, unique: true, index: true },
     username: { type: String, required: true, index: true },
     nombreArchivo: { type: String, required: true },
+    chat: { type: [{ role: String, content: String }], default: [] },
     problemas: { type: mongoose.Schema.Types.Mixed, default: [] },
     veredicto: {
       type: String,
