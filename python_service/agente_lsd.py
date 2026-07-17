@@ -280,7 +280,7 @@ RULE_CATALOG = {
         "fix_hint": "Recalcular detracción Ley 27.430 y regenerar el LSD.",
     },
     "LSD-REG04-BASE4-BASE5-001": {
-        "severidad": "CRITICO", "campo": "REG04 bases OS/INSSJP",
+        "severidad": "ADVERTENCIA", "campo": "REG04 bases OS/INSSJP",
         "fuente_pdf": "validaciones.pdf",
         "mensaje": "Base 4 (Obra Social) y Base 5 (INSSJP/PAMI) deben coincidir en el REG04.",
         "causa": "Diferencia de centavos por redondeo o mala parametrización de la obra social.",
@@ -294,7 +294,7 @@ RULE_CATALOG = {
         "fix_hint": "Revisar conceptos no remunerativos, detracción y parametrización de bases antes de exportar.",
     },
     "LSD-REG04-BASE9-002": {
-        "severidad": "CRITICO", "campo": "REG04 Base 9",
+        "severidad": "ADVERTENCIA", "campo": "REG04 Base 9",
         "fuente_pdf": "validaciones.pdf",
         "mensaje": "Base 9 (LRT) no puede superar Base 2 (contribuciones).",
         "causa": "Error en el cálculo de la base de la ART.",
@@ -327,6 +327,13 @@ RULE_CATALOG = {
         "mensaje": "El importe a detraer supera el tope legal máximo establecido.",
         "causa": "Error de cálculo en e-Sueldos al aplicar la detracción Ley 27.430.",
         "fix_hint": "Ajustar el importe de la detracción para que no supere el tope de la Ley 27.430.",
+    },
+    "LSD-REG04-TOPE-MAX": {
+        "severidad": "CRITICO", "campo": "REG04 Bases",
+        "fuente_pdf": "validaciones.pdf",
+        "mensaje": "La Base Imponible informada supera el tope máximo legal (MOPRE).",
+        "causa": "El sistema de liquidación no aplicó el tope legal a los conceptos remunerativos.",
+        "fix_hint": "Configurar el sistema de liquidación para que limite las bases 1, 4 y 5 al tope MOPRE vigente.",
     },
     "LSD-REG04-TOPE-MOPRE-SAC": {
         "severidad": "CRITICO", "campo": "REG04 Bases Imponibles",
@@ -910,7 +917,12 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
 
         concepto_0577  = _sumar_conceptos(conceptos, {"0577"})
         concepto_0448  = _sumar_conceptos(conceptos, {"0448"})
-        conceptos_no_rem = _sumar_conceptos(conceptos, {"0525", "0535", "0536", "0537", "0538", "0539"})
+        # Sumamos todos los conceptos que pertenezcan a la familia "05" (No Remunerativos)
+        conceptos_no_rem = sum(
+            c.get("importe", Decimal("0")) 
+            for c in conceptos 
+            if c.get("codigo_arca", "").startswith("05") and c.get("debito_credito", "C") == "C"
+        )
 
         # Tope máximo de detracción
         if importe_detraer is not None and importe_detraer > tope_detraccion:
@@ -986,8 +998,10 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
 
         # Base 9 > Base 2
         if base9 is not None and base2 is not None and base9 > base2 + Decimal("0.05"):
-            _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base9": str(base9), "base2": str(base2)})
+            # Si la Base 9 es mayor, verificamos si es porque hay conceptos No Remunerativos sumando
+            if base9 > (base2 + conceptos_no_rem + Decimal("0.05")):
+                 _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"base9": str(base9), "base2": str(base2)})
 
         # Base 9 = Base 2 con Base 1 < Base 2 (tope inconsistente)
         tolerancia = Decimal("0.01")
@@ -997,6 +1011,24 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             _add_issue(issues, "LSD-REG04-BASE9-003", linea=reg["linea"], cuil=reg["cuil"],
                        detalle={"base": 9, "informado": str(base9), "determinado": str(base1),
                                 "diferencia": str(base9 - base1)})
+
+        # Validar Tope MOPRE Máximo para Bases 1, 4 y 5
+        tope_mopre_base = Decimal("3183943.80")
+        
+        # Como en el TXT no viaja el código de AFIP, detectamos el SAC por los días informados.
+        # Si algún concepto tiene una cantidad > 30 (ej: 180 días del semestre), asumimos que es SAC.
+        tiene_sac = any(Decimal(c.get("cantidad", "0")) / Decimal("100") > Decimal("30") for c in conceptos)
+        
+        # El tope sube 50% si es mes de SAC (06 o 12) Y el empleado tiene un concepto semestral
+        if mes_liq in ("06", "12") and tiene_sac:
+            tope_mopre_max = tope_mopre_base * Decimal("1.5")
+        else:
+            tope_mopre_max = tope_mopre_base
+        
+        for num_base, valor_base in [("1", base1), ("4", base4), ("5", base5)]:
+            if valor_base is not None and valor_base > tope_mopre_max + Decimal("0.05"):
+                _add_issue(issues, "LSD-REG04-TOPE-MAX", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"base": num_base, "informado": str(valor_base), "tope_legal": str(tope_mopre_max)})
 
         # Base 2 = 0 con Base 4 > 0
         if base2 is not None and base2 == 0 and base4 is not None and base4 > 0:

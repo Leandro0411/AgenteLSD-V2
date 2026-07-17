@@ -109,12 +109,22 @@
       <h2>Usuarios registrados</h2>
       <table class="admin-table" id="tabla-usuarios">
         <thead>
-          <tr><th>Usuario</th><th>Rol</th><th>Creado</th><th>Acciones</th></tr>
+          <tr><th>Usuario</th><th>Mail</th><th>Rol</th><th>Creado</th><th>Acciones</th></tr>
         </thead>
         <tbody>
           <tr *ngFor="let u of usuarios">
             <td>{{ u.username }}</td>
-            <td><span class="badge" [ngClass]="u.rol">{{ u.rol }}</span></td>
+            <td>{{ u.email }}</td>
+            <td>
+              <!-- Select dinámico. Al cambiar, dispara la función -->
+              <select 
+                [ngModel]="u.rol" 
+                (ngModelChange)="onRolChange(u._id, $event)"
+                class="input-rol">
+                <option value="usuario">Usuario</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </td>
             <td>{{ u.creadoEn | date:'dd/MM/yyyy HH:mm' }}</td>
             <td>
               <button class="btn-danger-sm" (click)="eliminarUsuario(u.username)" [id]="'btn-del-' + u.username">

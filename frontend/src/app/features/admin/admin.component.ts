@@ -1,7 +1,7 @@
 // src/app/features/admin/admin.component.ts
 import { Component, OnInit } from '@angular/core';
 import { AdminService } from '../../core/services/admin.service';
-
+import { AuthService } from '../../core/services/auth.service';
 
 
 @Component({
@@ -72,6 +72,30 @@ export class AdminComponent implements OnInit {
         this.motorCargando = false;
       }
     });
+  }
+
+  onRolChange(usuarioId: string, nuevoRol: string): void {
+    // Opcional: Podés poner un sweetalert2 o un confirm() acá para evitar cambios por accidente
+    if (confirm(`¿Estás seguro de cambiar el rol a ${nuevoRol}?`)) {
+      
+      this.authService.cambiarRolUsuario(usuarioId, nuevoRol).subscribe({
+        next: (res) => {
+          console.log(res.mensaje);
+          // Mostrar notificación de éxito (Ej: Toastr o Alert)
+          alert('✅ El rol se actualizó correctamente');
+        },
+        error: (err) => {
+          console.error(err);
+          alert('❌ ' + (err.error?.error || 'No se pudo cambiar el rol'));
+          // Si falla, lo ideal es recargar la lista de usuarios para volver al valor original
+          this.cargarUsuarios(); 
+        }
+      });
+      
+    } else {
+      // Si el admin cancela, recargamos para que el select vuelva a como estaba
+      this.cargarUsuarios(); 
+    }
   }
 
   toggleReglaVisual(regla: any): void {
@@ -190,7 +214,7 @@ export class AdminComponent implements OnInit {
   nuevaRegla = { titulo: '', pregunta: '', respuesta: '', fuente: 'Manual' };
   reglaMsg   = '';
 
-  constructor(private admin: AdminService) {}
+  constructor(private admin: AdminService, private authService: AuthService) {}
 
   ngOnInit(): void {
     this.cargarUsuarios();

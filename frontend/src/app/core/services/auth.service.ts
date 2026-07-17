@@ -48,6 +48,11 @@ export class AuthService {
     return !!this.token;
   }
 
+  // ── Cambiar Rol de Usuario ──
+  cambiarRolUsuario(usuarioId: string, nuevoRol: string): Observable<any> {
+    return this.http.put(`${this.API}/usuarios/${usuarioId}/rol`, { rol: nuevoRol });
+  }
+
   login(username: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.API}/login`, { username, password }).pipe(
       tap((res) => {
@@ -57,8 +62,11 @@ export class AuthService {
     );
   }
 
-  registro(username: string, password: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.API}/register`, { username, password }).pipe(
+  // 1. Agregamos email y telefono a los parámetros que recibe la función
+  registro(username: string, password: string, email: string, telefono?: string): Observable<LoginResponse> {
+    
+    // 2. Sumamos email y telefono adentro de las llaves { ... } para que viajen al backend
+    return this.http.post<LoginResponse>(`${this.API}/register`, { username, password, email, telefono }).pipe(
       tap((res) => {
         // Guardamos la sesión exactamente igual que en el login
         this._token = res.token;

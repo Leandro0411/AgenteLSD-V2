@@ -1,18 +1,5 @@
 [
   {
-    "_id": "6a57b4e5eeb20cfb9f91a596",
-    "registroTarget": "04",
-    "campo": "importe_detraer",
-    "operador": ">",
-    "valor": "7038.70",
-    "severidad": "CRITICO",
-    "mensaje": "La detracción supera el tope legal. Verificá si hay un error de redondeo por 1 centavo en legajos de media jornada.",
-    "activa": true,
-    "createdAt": "2026-07-15T16:27:17.036Z",
-    "updatedAt": "2026-07-15T16:27:17.036Z",
-    "__v": 0
-  },
-  {
     "_id": "6a57b508eeb20cfb9f91a598",
     "registroTarget": "03",
     "campo": "importe",

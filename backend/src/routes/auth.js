@@ -1,4 +1,4 @@
-// src/routes/auth.js — Login y gestión de sesión con JWT
+// src/routes/auth.js
 const express  = require('express');
 const jwt      = require('jsonwebtoken');
 const Usuario  = require('../models/Usuario');
@@ -7,7 +7,6 @@ const { verificarToken } = require('../middleware/auth');
 const router = express.Router();
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
-// Equivalente a POST /login de Flask
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -16,7 +15,6 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // passwordHash tiene select:false en el modelo → hay que pedirlo explícitamente
     const usuario = await Usuario.findOne({ username: username.trim().toLowerCase() }).select('+passwordHash');
 
     if (!usuario || !(await usuario.verificarPassword(password))) {
@@ -42,27 +40,33 @@ router.post('/login', async (req, res) => {
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  // Ahora desestructuramos los campos nuevos
+  const { username, email, telefono, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ ok: false, error: 'Usuario y contraseña requeridos.' });
+  if (!username || !email || !password) {
+    return res.status(400).json({ ok: false, error: 'Usuario, email y contraseña son obligatorios.' });
   }
 
   try {
-    // 1. Verificamos si el usuario ya existe
-    const existe = await Usuario.findOne({ username: username.trim().toLowerCase() });
-    if (existe) {
+    // Verificamos si el usuario O EL EMAIL ya existen
+    const existeUsername = await Usuario.findOne({ username: username.trim().toLowerCase() });
+    if (existeUsername) {
       return res.status(400).json({ ok: false, error: 'Ese nombre de usuario ya está en uso.' });
     }
 
-    // 2. Creamos el usuario (asumimos que tu modelo Usuario encripta la password antes de guardar)
+    const existeEmail = await Usuario.findOne({ email: email.trim().toLowerCase() });
+    if (existeEmail) {
+      return res.status(400).json({ ok: false, error: 'Ese correo electrónico ya está registrado.' });
+    }
+
     const nuevoUsuario = await Usuario.create({
       username: username.trim().toLowerCase(),
+      email: email.trim().toLowerCase(),
+      telefono: telefono ? telefono.trim() : '',
       passwordHash: password,
-      rol: 'usuario' // Por defecto le damos el rol base
+      rol: 'usuario'
     });
 
-    // 3. Generamos el token para loguearlo automáticamente
     const token = jwt.sign(
       { id: nuevoUsuario._id, username: nuevoUsuario.username, rol: nuevoUsuario.rol },
       process.env.JWT_SECRET,
@@ -81,7 +85,6 @@ router.post('/register', async (req, res) => {
 });
 
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
-// Devuelve datos del usuario autenticado (útil para Angular al recargar la app)
 router.get('/me', verificarToken, async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.usuario.id).select('-passwordHash');
@@ -92,11 +95,47 @@ router.get('/me', verificarToken, async (req, res) => {
   }
 });
 
-// ── POST /api/auth/logout ─────────────────────────────────────────────────────
-// Con JWT stateless, el logout real lo maneja el frontend borrando el token.
-// Este endpoint existe para consistencia de API y futura implementación de blacklist.
 router.post('/logout', verificarToken, (req, res) => {
   return res.json({ ok: true, mensaje: 'Sesión cerrada.' });
+});
+
+// ── PUT /api/auth/usuarios/:id/rol ──────────────────────────────────────────
+// Cambiar el rol de un usuario (Solo Administradores)
+router.put('/usuarios/:id/rol', verificarToken, async (req, res) => {
+  try {
+    // 1. Verificamos que quien hace la petición tenga rol 'admin'
+    if (req.usuario.rol !== 'admin') {
+      return res.status(403).json({ ok: false, error: 'Acceso denegado. Solo los administradores pueden cambiar roles.' });
+    }
+
+    const { rol } = req.body;
+    
+    // 2. Validamos que el rol enviado sea válido
+    if (!['admin', 'usuario'].includes(rol)) {
+      return res.status(400).json({ ok: false, error: 'Rol inválido. Debe ser admin o usuario.' });
+    }
+
+    // 3. Actualizamos el usuario en la base de datos
+    const usuarioActualizado = await Usuario.findByIdAndUpdate(
+      req.params.id,
+      { rol: rol },
+      { new: true } // Para que nos devuelva el documento ya modificado
+    ).select('-passwordHash');
+
+    if (!usuarioActualizado) {
+      return res.status(404).json({ ok: false, error: 'Usuario no encontrado.' });
+    }
+
+    return res.json({ 
+      ok: true, 
+      mensaje: 'Rol actualizado correctamente.',
+      usuario: usuarioActualizado 
+    });
+
+  } catch (err) {
+    console.error('[auth] Error al cambiar rol:', err);
+    return res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
+  }
 });
 
 module.exports = router;

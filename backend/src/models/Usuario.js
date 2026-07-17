@@ -1,4 +1,4 @@
-// src/models/Usuario.js — Equivalente a tabla users de SQLite
+// src/models/Usuario.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -10,6 +10,19 @@ const usuarioSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Debe ingresar un email válido']
+    },
+    telefono: {
+      type: String,
+      required: false,
+      trim: true
     },
     passwordHash: {
       type: String,
