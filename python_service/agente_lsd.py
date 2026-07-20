@@ -949,7 +949,8 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         legajo   = (empleado.get("legajo") or "").strip()
         conceptos = analisis["conceptos_por_cuil"].get(reg["cuil"], [])
 
-        tiene_cod_arca = any(c.get("codigo_arca", "").strip().isdigit() for c in conceptos)
+        # Rastrea si BASE9-ARCA ya detectó error para este CUIL (para suprimir reglas redundantes)
+        base9_arca_disparado = False
 
         if base9 is not None and conceptos:
             # Fórmula ARCA exacta: suma créditos REG03 excluyendo indemnizatorios y redondeo
@@ -972,6 +973,7 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
 
             diferencia_base9 = base9 - base9_determinada
             if abs(diferencia_base9) > Decimal("1.00"):
+                base9_arca_disparado = True
                 _add_issue(issues, "LSD-REG04-BASE9-ARCA", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={
                                "base": "9",
@@ -1003,15 +1005,15 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
 
 
         # Tope proporcional SAC guillotinado (CORREGIDO)
+        # Usa códigos internos de SAC: 0026 (SAC semestral) y 0027 (SAC proporcional)
+        CODIGOS_SAC = {"0026", "0027"}
         if base1 is not None and base1 > Decimal("1000000.00"):
             for concepto in conceptos:
-                imp_con  = concepto.get("importe", Decimal("0"))
-                cant_raw = concepto.get("cantidad", "0")
-                cod_arca = concepto.get("codigo_arca", "")
-                deb_cred = concepto.get("debito_credito", "C")
-                
-                # SOLO validamos si es un Crédito (C) y si el código ARCA pertenece a la familia SAC (120xxx)
-                if deb_cred == "C" and cod_arca.startswith("120"):
+                imp_con    = concepto.get("importe", Decimal("0"))
+                cant_raw   = concepto.get("cantidad", "0")
+                cod_int    = concepto.get("codigo_concepto", "").strip()
+                deb_cred   = concepto.get("debito_credito", "C")
+                if deb_cred == "C" and cod_int in CODIGOS_SAC:
                     if imp_con > Decimal("100000.00") and cant_raw.isdigit():
                         dias = Decimal(cant_raw) / Decimal("100")
                         if Decimal("0") < dias <= Decimal("15"):
@@ -1061,11 +1063,10 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                        detalle={"base4": str(base4), "base5": str(base5),
                                 "diferencia": str(abs(base4 - base5))})
 
-        # Base 9 > Base 2
-        if base9 is not None and base2 is not None and base9 > base2 + Decimal("0.05"):
-            # Si la Base 9 es mayor, verificamos si es porque hay conceptos No Remunerativos sumando
+        # Base 9 > Base 2 — solo si BASE9-ARCA no lo detectó ya con más precisión
+        if not base9_arca_disparado and base9 is not None and base2 is not None and base9 > base2 + Decimal("0.05"):
             if base9 > (base2 + conceptos_no_rem + Decimal("0.05")):
-                 _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
+                _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"base9": str(base9), "base2": str(base2)})
 
         # Base 9 = Base 2 con Base 1 < Base 2 (tope inconsistente)
@@ -1100,32 +1101,29 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             _add_issue(issues, "LSD-REG04-BASE2-001", linea=reg["linea"], cuil=reg["cuil"],
                        detalle={"base2": str(base2), "base4": str(base4)})
 
-        # Base 9 inflada por concepto 0577
-        if base1 is not None and base9 is not None and concepto_0577 > Decimal("0") and base9 > base1:
-            _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"patron": "concepto_0577_con_base9_mayor_a_base1", "legajo": legajo,
-                                "base": 9, "informado": str(base9), "determinado": str(base1),
-                                "diferencia": str(base9 - base1), "concepto_0577": str(concepto_0577),
-                                "raw_reg04": reg.get("raw", ""),
-                                "raw_reg03_relacionados": _raws_conceptos(conceptos, {"0577"})})
+        # BASES-CONCEPTOS: solo aplica si BASE9-ARCA no capturó ya el problema (evita duplicados)
+        if not base9_arca_disparado:
+            # Base 9 inflada por concepto 0577 (ASIG NO REM EXTR en empleados ART)
+            if base1 is not None and base9 is not None and concepto_0577 > Decimal("0") and base9 > base1:
+                _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"patron": "concepto_0577_con_base9_mayor_a_base1", "legajo": legajo,
+                                    "base": 9, "informado": str(base9), "determinado": str(base1),
+                                    "diferencia": str(base9 - base1), "concepto_0577": str(concepto_0577)})
 
-        # Base 9 inflada por conceptos no remunerativos 0525/0535-0539
-        if base1 is not None and base1 > Decimal("0") and base9 is not None and conceptos_no_rem > Decimal("0") and base9 > (base1 * Decimal("2")):
-            _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"patron": "incrementos_no_remunerativos_inflando_base9", "legajo": legajo,
-                                "base": 9, "informado": str(base9), "determinado": str(base1),
-                                "diferencia": str(base9 - base1),
-                                "raw_reg04": reg.get("raw", ""),
-                                "raw_reg03_relacionados": _raws_conceptos(conceptos, {"0525", "0535", "0536", "0537", "0538", "0539"})})
+            # Base 9 inflada por conceptos indemnizatorios detectados sin código ARCA
+            if (base1 is not None and base1 > Decimal("0") and base9 is not None
+                    and conceptos_no_rem > Decimal("0") and base9 > (base1 * Decimal("2"))):
+                _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"patron": "incrementos_no_remunerativos_inflando_base9", "legajo": legajo,
+                                    "base": 9, "informado": str(base9), "determinado": str(base1),
+                                    "diferencia": str(base9 - base1)})
 
-        # Base 9 inflada por concepto 0448
-        if rem is not None and base9 is not None and concepto_0448 > Decimal("0") and base9 > rem:
-            _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"patron": "concepto_0448_sumado_indebidamente_a_base9", "legajo": legajo,
-                                "base": 9, "informado": str(base9), "determinado": str(rem),
-                                "diferencia": str(base9 - rem),
-                                "raw_reg04": reg.get("raw", ""),
-                                "raw_reg03_relacionados": _raws_conceptos(conceptos, {"0448"})})
+            # Base 9 inflada por concepto 0448 (NR presentismo sumado a ART)
+            if rem is not None and base9 is not None and concepto_0448 > Decimal("0") and base9 > rem:
+                _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"patron": "concepto_0448_sumado_indebidamente_a_base9", "legajo": legajo,
+                                    "base": 9, "informado": str(base9), "determinado": str(rem),
+                                    "diferencia": str(base9 - rem)})
 
     # ── REG03 conceptos ARCA ─────────────────────────────────────────────────
     periodo_mes = None
