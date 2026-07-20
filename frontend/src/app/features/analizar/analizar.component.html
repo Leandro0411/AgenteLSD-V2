@@ -327,9 +327,7 @@
     </div>
   </div>
 
-
   <div class="acciones-post-analisis" *ngIf="estado === 'completado' && !auth.esAdmin">
-    
     <div *ngIf="!ratingEnviado" class="caja-accion caja-rating">
       <h3>¿Qué te pareció este análisis?</h3>
       <div class="stars-container" (mouseleave)="hoverEstrellasRating = 0">

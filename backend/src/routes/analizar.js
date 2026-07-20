@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const { verificarToken } = require('../middleware/auth');
 const { analizarArchivo } = require('../services/pythonBridge');
 const HistorialAnalisis  = require('../models/HistorialAnalisis');
+const WikiRegla = require('../models/WikiRegla');
 
 const ORIGINALES_DIR = path.resolve(__dirname, '../../uploads/originales');
 
@@ -126,19 +127,55 @@ router.get('/stream/:sessionId', async (req, res) => {
   const proceso = analizarArchivo(
     rutaReal,
     sesion.modo_analisis || 'auto',
-    // onEvento
+    
+    // onEvento — Vuelve a ser súper rápido (síncrono)
     (evento) => {
-      enviarEvento(evento);
       if (evento.tipo === 'informe_final' && evento.informe) {
+        // Solo guardamos el informe en memoria, NO lo enviamos todavía
         informeFinal = evento.informe;
+      } else {
+        // Los eventos de progreso ('Analizando base 9...') pasan directo
+        enviarEvento(evento);
       }
     },
-    // onEnd — Python terminó exitosamente
+
+    // onEnd — Python terminó. ACÁ es donde cruzamos los datos con MongoDB
     async () => {
       clearInterval(keepAlive);
-      // Guardar informe en MongoDB
+      
       if (informeFinal) {
         try {
+          // 1. Buscamos las ediciones de la WIKI en la BD
+          const reglasEditadas = await WikiRegla.find({}).lean();
+          
+          const mapaReglas = {};
+          // 👇 Acá es el cambio clave: usamos r.ruleId
+          reglasEditadas.forEach(r => { mapaReglas[r.ruleId] = r; });
+
+          // 2. Cruzamos y "pisamos" los datos
+          if (informeFinal.problemas && Array.isArray(informeFinal.problemas)) {
+            informeFinal.problemas.forEach(problema => {
+              // En Angular el ID viaja como p.id, así que buscamos esa propiedad
+              const codigoRegla = problema.id || problema.codigo; 
+              
+              if (codigoRegla && mapaReglas[codigoRegla]) {
+                const edicionAdmin = mapaReglas[codigoRegla];
+                if (edicionAdmin.causa) problema.causa = edicionAdmin.causa;
+                if (edicionAdmin.solucion) problema.solucion = edicionAdmin.solucion;
+                if (edicionAdmin.videoUrl) problema.videoUrl = edicionAdmin.videoUrl;
+                
+                // Si el admin editó los pasos del tutorial, también los pisamos
+                if (edicionAdmin.tutorial_pasos && edicionAdmin.tutorial_pasos.length > 0) {
+                  problema.tutorial_pasos = edicionAdmin.tutorial_pasos;
+                }
+              }
+            });
+          }
+
+          // 3. Enviamos a Angular
+          enviarEvento({ tipo: 'informe_final', informe: informeFinal });
+
+          // 4. Guardamos en historial
           await HistorialAnalisis.findOneAndUpdate(
             { sessionId },
             {
@@ -153,13 +190,15 @@ router.get('/stream/:sessionId', async (req, res) => {
             }
           );
         } catch (e) {
-          console.error('[analizar] Error guardando informe en MongoDB:', e);
+          console.error('[analizar] Error enriqueciendo WIKI:', e);
         }
       }
+      
       enviarEvento({ tipo: 'fin', sessionId });
       res.end();
     },
-    // onError — Python tuvo un error
+
+    // onError — Python tuvo un error feo
     (mensaje) => {
       clearInterval(keepAlive);
       enviarEvento({ tipo: 'error', mensaje });

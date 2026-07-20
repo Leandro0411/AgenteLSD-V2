@@ -76,7 +76,7 @@ export class AdminService {
   }
 
   guardarRegla(ruleId: string, data: any): Observable<any> {
-    return this.http.post<any>(`${this.API}/wiki/reglas/${ruleId}`, data);
+    return this.http.post<any>(`${this.API}/admin/wiki/reglas/${ruleId}`, data);
   }
 
   // ── Historial ───────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ const { verificarToken, soloAdmin } = require('../middleware/auth');
 const NormativaQA      = require('../models/NormativaQA');
 const ReglaNormativa   = require('../models/ReglaNormativa');
 const ReglaValidacion = require('../models/ReglaValidacion');
+const WikiRegla = require('../models/WikiRegla');
 
 const router = express.Router();
 
@@ -410,6 +411,27 @@ router.get('/health', async (_req, res) => {
     node_version:   process.version,
     env:            process.env.NODE_ENV,
   });
+});
+
+// ── WIKI (Edición de errores de Python) ───────────────────────────────────────
+// POST /api/admin/wiki/reglas/:ruleId
+router.post('/wiki/reglas/:ruleId', verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const { causa, solucion, videoUrl } = req.body;
+    const regla = await WikiRegla.findOneAndUpdate(
+      { ruleId: req.params.ruleId }, // 👇 Usamos ruleId para que coincida con tu modelo
+      { 
+        causa, 
+        solucion, 
+        videoUrl, 
+        editadoPor: req.usuario.username 
+      },
+      { new: true, upsert: true }
+    );
+    return res.json({ ok: true, regla });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 module.exports = router;

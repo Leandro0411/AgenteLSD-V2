@@ -294,11 +294,20 @@ RULE_CATALOG = {
         "fix_hint": "Revisar conceptos no remunerativos, detracción y parametrización de bases antes de exportar.",
     },
     "LSD-REG04-BASE9-002": {
+        # Degradado a ADVERTENCIA: ARCA no rechaza solo por base9 > base2
+        # (pueden ser distintas por conceptos que aportan a LRT pero no a SIPA)
         "severidad": "ADVERTENCIA", "campo": "REG04 Base 9",
         "fuente_pdf": "validaciones.pdf",
-        "mensaje": "Base 9 (LRT) no puede superar Base 2 (contribuciones).",
-        "causa": "Error en el cálculo de la base de la ART.",
-        "fix_hint": "Recalcular bases imponibles y regenerar el LSD.",
+        "mensaje": "Base 9 (LRT) supera Base 2 (contribuciones SIPA) — revisar si hay conceptos que aportan a LRT pero no a SIPA.",
+        "causa": "Puede ser correcto si hay conceptos que tributan LRT (ART) pero no SIPA. Verificar parametrización.",
+        "fix_hint": "Revisar si la diferencia corresponde a conceptos LRT-exclusivos. Si no, recalcular bases desde e-Sueldos.",
+    },
+    "LSD-REG04-BASE9-ARCA": {
+        "severidad": "CRITICO", "campo": "REG04 Base 9",
+        "fuente_pdf": "validaciones.pdf",
+        "mensaje": "Base imponible 9 (LRT/ART) informada en REG04 difiere de la determinada desde los conceptos REG03.",
+        "causa": "El exportador de e-Sueldos está incluyendo conceptos indemnizatorios o de redondeo en la Base 9, que ARCA excluye al validar.",
+        "fix_hint": "Verificar que conceptos indemnizatorios (familia 520xxx: vacaciones no gozadas, indemnización, preaviso, integración mes despido y sus SACs) NO sean sumados a la Base 9 de la ART. Regenerar el TXT corrigiendo la parametrización.",
     },
     "LSD-REG04-BASE9-003": {
         "severidad": "CRITICO", "campo": "REG04 Base 9",
@@ -343,11 +352,12 @@ RULE_CATALOG = {
         "fix_hint": "Cambiar el concepto a SAC semestral o informar los días reales del semestre en las unidades.",
     },
     "LSD-REG04-BASE9-INDEM": {
+        # Regla de respaldo cuando no hay codigo_arca disponible para la regla ARCA
         "severidad": "CRITICO", "campo": "REG04 Base 9",
         "fuente_pdf": "LS_Conceptos_Basicos_y_Guia_de_Uso_V2.0.pdf",
         "mensaje": "Base 9 inflada erróneamente por sumar indemnizaciones y redondeos que ARCA excluye.",
         "causa": "El exportador de e-Sueldos está inyectando erróneamente conceptos indemnizatorios (ej: 0525, 0536) en la Base 9 de la ART.",
-        "fix_hint": "Error de exportación: e-Sueldos está sumando conceptos indemnizatorios a la ART. Modificar manualmente el TXT o forzar bases.",
+        "fix_hint": "Error de exportación: e-Sueldos está sumando conceptos indemnizatorios a la ART. Revisar parametrización y regenerar el TXT.",
     },
     "LSD-REG04-BASES-CONCEPTOS-001": {
         "severidad": "CRITICO", "campo": "REG03/REG04 bases imponibles",
@@ -885,12 +895,36 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             if "-" in campos:
                 _add_issue(issues, "LSD-NUM-NEG-001", linea=reg["linea"], cuil=reg.get("cuil"),
                            detalle={"tipo": reg["tipo"]})
-
     # ── REG04 duplicados ─────────────────────────────────────────────────────
     for cuil, regs in analisis["bases_por_cuil"].items():
         if len(regs) > 1:
             _add_issue(issues, "LSD-REG04-DUP-001", cuil=cuil,
                        detalle={"cantidad_reg04": len(regs), "lineas": [r["linea"] for r in regs]})
+
+    # ── Cálculo de Base9 según lógica ARCA ──────────────────────────────
+    # ARCA determina Base 9 sumando todos los créditos REG03 EXCEPTO los
+    # conceptos de naturaleza indemnizatoria (familia AFIP 520xxx) y redondeo.
+    # Como el TXT LSD solo lleva el código interno (4 dígitos), usamos un set
+    # de los códigos internos más comunes que corresponden a esas familias.
+    # Fuente: verificación empírica contra errores de validación reales de ARCA.
+    #
+    # EXCLUIDOS (familia AFIP 520xxx = indemnizatorios + sus SACs, y 799999 = redondeo):
+    #   0525 → ANTIGUEDAD ART 245 LCT (indem por despido)
+    #   0533 → VACACIONES NO GOZADAS
+    #   0534 → SAC S/VACACIONES NO GOZADAS
+    #   0535 → INDEM SUSTITUTIVA PREAVISO
+    #   0536 → SAC S/PREAVISO
+    #   0537 → INTEGRACION MES DESPIDO
+    #   0538 → SAC S/INTEGRACION MES DESPIDO
+    #   0539 → SAC NO REMUNERATIVOS (cuando es sobre indem)
+    #   0541 → INDEMNIZACION ANTIGUEDAD (variante)
+    #   0546 → OMISION PREAVISO
+    #   0547 → SAC S/INDEMNIZACION ANTIGUEDAD
+    #   0599 → REDONDEO
+    CODIGOS_EXCLUIDOS_BASE9_ARCA = {
+        "0525", "0533", "0534", "0535", "0536", "0537", "0538", "0539",
+        "0541", "0546", "0547", "0599",
+    }
 
     # ── Validaciones de bases REG04 (matemáticas y de negocio) ───────────────
     mes_liq = "01"
@@ -915,27 +949,58 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         legajo   = (empleado.get("legajo") or "").strip()
         conceptos = analisis["conceptos_por_cuil"].get(reg["cuil"], [])
 
+        tiene_cod_arca = any(c.get("codigo_arca", "").strip().isdigit() for c in conceptos)
+
+        if base9 is not None and conceptos:
+            # Fórmula ARCA exacta: suma créditos REG03 excluyendo indemnizatorios y redondeo
+            base9_determinada = Decimal("0")
+            conceptos_excluidos_arca = []
+            for c in conceptos:
+                if c.get("debito_credito") != "C":
+                    continue
+                imp = c.get("importe")
+                if imp is None:
+                    continue
+                cod_interno = c.get("codigo_concepto", "").strip()
+                if cod_interno in CODIGOS_EXCLUIDOS_BASE9_ARCA:
+                    conceptos_excluidos_arca.append({
+                        "codigo": cod_interno,
+                        "importe": str(imp),
+                    })
+                else:
+                    base9_determinada += imp
+
+            diferencia_base9 = base9 - base9_determinada
+            if abs(diferencia_base9) > Decimal("1.00"):
+                _add_issue(issues, "LSD-REG04-BASE9-ARCA", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={
+                               "base": "9",
+                               "informado": str(base9),
+                               "determinado": str(base9_determinada),
+                               "diferencia": str(diferencia_base9),
+                               "conceptos_excluidos_por_arca": conceptos_excluidos_arca[:10],
+                               "legajo": legajo,
+                           })
+        elif base9 is not None and not tiene_cod_arca:
+            # Fallback: sin código ARCA disponible, usamos detección por código interno conocido
+            conceptos_infladores = {"0525", "0533", "0534", "0535", "0536", "0537", "0538", "0539", "0577", "0599"}
+            suma_erronea = _sumar_conceptos(conceptos, conceptos_infladores)
+            if suma_erronea > Decimal("50.00"):  # tolerancia $50 para redondeos
+                _add_issue(issues, "LSD-REG04-BASE9-INDEM", linea=reg["linea"], cuil=reg["cuil"],
+                           detalle={"base": "9", "informado": str(base9),
+                                    "determinado": str(base9 - suma_erronea),
+                                    "diferencia": str(suma_erronea), "legajo": legajo})
+
         concepto_0577  = _sumar_conceptos(conceptos, {"0577"})
         concepto_0448  = _sumar_conceptos(conceptos, {"0448"})
-        # Sumamos todos los conceptos que pertenezcan a la familia "05" (No Remunerativos)
-        conceptos_no_rem = sum(
-            c.get("importe", Decimal("0")) 
-            for c in conceptos 
-            if c.get("codigo_arca", "").startswith("05") and c.get("debito_credito", "C") == "C"
-        )
+        conceptos_no_rem = _sumar_conceptos(conceptos, {"0525", "0535", "0536", "0537", "0538", "0539"})
 
         # Tope máximo de detracción
         if importe_detraer is not None and importe_detraer > tope_detraccion:
             _add_issue(issues, "LSD-REG04-DETRACCION-MAX", linea=reg["linea"], cuil=reg["cuil"],
                        detalle={"importe_detraer": str(importe_detraer), "tope_maximo": str(tope_detraccion), "mes": mes_liq})
 
-        # Base 9 inflada por indemnizaciones
-        conceptos_infladores = {"0525", "0536", "0537", "0538", "0577", "0599"}
-        suma_erronea = _sumar_conceptos(conceptos, conceptos_infladores)
-        if base9 is not None and suma_erronea > Decimal("0") and base9 > (rem or Decimal("0")):
-            _add_issue(issues, "LSD-REG04-BASE9-INDEM", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base": "9", "informado": str(base9), "determinado": str(base9 - suma_erronea),
-                                "diferencia": str(suma_erronea), "legajo": legajo})
+
 
         # Tope proporcional SAC guillotinado (CORREGIDO)
         if base1 is not None and base1 > Decimal("1000000.00"):
