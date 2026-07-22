@@ -38,9 +38,15 @@ const upload = multer({
 });
 
 // ── POST /api/analizar/upload ─────────────────────────────────────────────────
-// Recibe el archivo TXT, crea el registro en MongoDB y devuelve el sessionId
-router.post('/upload', verificarToken, upload.single('archivo'), async (req, res) => {
-  if (!req.file) {
+// Recibe el archivo TXT principal y, opcionalmente, el TXT de conceptos de la empresa.
+router.post('/upload', verificarToken, upload.fields([
+  { name: 'archivo', maxCount: 1 },
+  { name: 'conceptos', maxCount: 1 },
+]), async (req, res) => {
+  const archivoPrincipal = req.files?.archivo?.[0];
+  const archivoConceptos = req.files?.conceptos?.[0] || null;
+
+  if (!archivoPrincipal) {
     return res.status(400).json({ ok: false, error: 'No se recibió ningún archivo.' });
   }
 
@@ -51,24 +57,27 @@ router.post('/upload', verificarToken, upload.single('archivo'), async (req, res
   // Hacer una copia segura del TXT original para que el admin lo pueda descargar
   const fs = require('fs');
   const rutaOriginal = path.join(ORIGINALES_DIR, `${sessionId}.txt`);
-  fs.copyFileSync(req.file.path, rutaOriginal);
+  fs.copyFileSync(archivoPrincipal.path, rutaOriginal);
 
   try {
     // Crear registro pendiente en MongoDB (guarda la ruta temporal para el stream)
     await HistorialAnalisis.create({
       sessionId,
       username: req.usuario.username,
-      nombreArchivo: req.file.originalname,
+      nombreArchivo: archivoPrincipal.originalname,
+      nombreArchivoConceptos: archivoConceptos?.originalname,
       completado: false,
       modo_analisis: modo,
-      _rutaTmp: req.file.path,  // ← ruta absoluta usada por el stream SSE
+      _rutaTmp: archivoPrincipal.path,  // ← ruta absoluta usada por el stream SSE
+      _rutaConceptosTmp: archivoConceptos?.path,
     });
 
     return res.json({
       ok: true,
       sessionId,
-      archivo: req.file.originalname,
-      rutaTmp: req.file.path, // solo para debug interno
+      archivo: archivoPrincipal.originalname,
+      archivoConceptos: archivoConceptos?.originalname || null,
+      rutaTmp: archivoPrincipal.path, // solo para debug interno
     });
   } catch (err) {
     console.error('[analizar] Error creando sesión:', err);
@@ -101,8 +110,9 @@ router.get('/stream/:sessionId', async (req, res) => {
   }
 
   // Recuperar la ruta del archivo desde MongoDB (campo _rutaTmp, excluido por defecto)
-  const sesionConRuta = await HistorialAnalisis.findOne({ sessionId }).select('+_rutaTmp');
+  const sesionConRuta = await HistorialAnalisis.findOne({ sessionId }).select('+_rutaTmp +_rutaConceptosTmp');
   const rutaReal = sesionConRuta?._rutaTmp;
+  const rutaConceptos = sesionConRuta?._rutaConceptosTmp;
 
   if (!rutaReal || !require('fs').existsSync(rutaReal)) {
     return res.status(404).json({ ok: false, error: 'Archivo temporal no encontrado. Volvé a subir el archivo.' });
@@ -127,6 +137,7 @@ router.get('/stream/:sessionId', async (req, res) => {
   const proceso = analizarArchivo(
     rutaReal,
     sesion.modo_analisis || 'auto',
+    rutaConceptos,
     
     // onEvento — Vuelve a ser súper rápido (síncrono)
     (evento) => {

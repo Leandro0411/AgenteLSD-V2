@@ -29,6 +29,21 @@
       <small>{{ (archivoSeleccionado.size / 1024 / 1024).toFixed(2) }} MB · Listo para analizar</small>
     </div>
   </div>
+
+  <div class="conceptos-upload">
+    <div class="conceptos-copy">
+      <strong>Conceptos de la empresa</strong>
+      <span>Opcional: subí el export de Conceptos del Contribuyente para cruzar la parametrización contra el LSD.</span>
+    </div>
+    <input #conceptosInput type="file" accept=".txt" hidden (change)="onConceptosInput($event)" />
+    <button type="button" class="btn-secondary conceptos-btn" (click)="conceptosInput.click()">
+      {{ conceptosSeleccionado ? 'Cambiar conceptos' : 'Subir conceptos' }}
+    </button>
+    <div class="conceptos-file" *ngIf="conceptosSeleccionado">
+      <span>{{ conceptosSeleccionado.name }}</span>
+      <button type="button" (click)="quitarConceptos($event)">Quitar</button>
+    </div>
+  </div>
   
   <div class="error-banner" *ngIf="errorMsg">⚠️ {{ errorMsg }}</div>
 
@@ -104,11 +119,35 @@
     <div class="stat-card advertencia"><span class="stat-num">{{ informe.estadisticas?.advertencias }}</span><span class="stat-label">Advertencias</span></div>
   </div>
 
+  <div class="diagnostico-rapido">
+    <div class="diag-item ok">
+      <span class="diag-label">Archivo LSD</span>
+      <strong>Procesado</strong>
+      <small>{{ informe.validacion_deterministica?.total_lineas || 0 }} líneas</small>
+    </div>
+    <div class="diag-item" [ngClass]="estadoConfiguracion">
+      <span class="diag-label">Conceptos empresa</span>
+      <strong>{{ textoEstadoConfiguracion }}</strong>
+      <small *ngIf="informe.config_conceptos?.presente">
+        {{ informe.config_conceptos.conceptos_encontrados }}/{{ informe.config_conceptos.conceptos_usados }} usados cubiertos
+      </small>
+      <small *ngIf="!informe.config_conceptos?.presente">Cruce no aplicado</small>
+    </div>
+    <div class="diag-item" [ngClass]="informe.veredicto === 'PRESENTABLE' ? 'ok' : informe.veredicto === 'REVISAR' ? 'warning' : 'danger'">
+      <span class="diag-label">Resultado probable</span>
+      <strong>{{ informe.veredicto }}</strong>
+      <small>{{ informe.estadisticas?.errores_criticos || 0 }} críticos</small>
+    </div>
+  </div>
+
   <!-- Tabs -->
   <div class="tabs">
-    <button [class.active]="tabActiva === 'resumen'"   (click)="tabActiva = 'resumen'"   id="tab-resumen">📋 Resumen</button>
+    <button [class.active]="tabActiva === 'resumen'"   (click)="tabActiva = 'resumen'"   id="tab-resumen">Resumen</button>
     <button [class.active]="tabActiva === 'problemas'" (click)="tabActiva = 'problemas'" id="tab-problemas">
-      🔍 Problemas ({{ informe.problemas?.length || 0 }})
+      Problemas ({{ problemasOperativos.length || 0 }})
+    </button>
+    <button [class.active]="tabActiva === 'configuracion'" (click)="tabActiva = 'configuracion'" id="tab-configuracion">
+      Configuración ({{ problemasConfiguracion.length || 0 }})
     </button>
   </div>
 
@@ -120,6 +159,17 @@
     <div *ngIf="informe.errores_arca?.presente" class="arca-card">
       <h3>Errores ARCA detectados</h3>
       <p>{{ informe.errores_arca.resumen }}</p>
+    </div>
+    <div *ngIf="informe.config_conceptos?.presente" class="conceptos-summary" [ngClass]="estadoConfiguracion">
+      <h3>Pre-chequeo de configuración</h3>
+      <p>
+        Cobertura {{ informe.config_conceptos.cobertura }}%:
+        {{ informe.config_conceptos.conceptos_encontrados }} de {{ informe.config_conceptos.conceptos_usados }}
+        conceptos usados en el LSD aparecen en el export de la empresa.
+      </p>
+      <div class="conceptos-faltantes" *ngIf="informe.config_conceptos.faltantes?.length">
+        <span *ngFor="let codigo of informe.config_conceptos.faltantes" class="concepto-chip">{{ codigo }}</span>
+      </div>
     </div>
 
     <!-- ── DASHBOARD DE MÉTRICAS ────────────────────────────────────────── -->
@@ -224,11 +274,11 @@
 
   <!-- Tab: Problemas -->
   <div *ngIf="tabActiva === 'problemas'" class="tab-content">
-    <div *ngIf="informe.problemas?.length === 0" class="no-problemas">
-      🎉 No se detectaron problemas.
+    <div *ngIf="problemasOperativos.length === 0" class="no-problemas">
+      No se detectaron problemas operativos.
     </div>
 
-    <div *ngFor="let p of informe.problemas" class="problema-card" [ngClass]="p.severidad?.toLowerCase()" id="problema-{{ p.id }}">
+    <div *ngFor="let p of problemasOperativos" class="problema-card" [ngClass]="p.severidad?.toLowerCase()" id="problema-{{ p.id }}">
 
       <!-- Header clickeable -->
       <div class="problema-header" (click)="toggleProblema(p.id)">
@@ -259,8 +309,19 @@
       <!-- Cuerpo expandible -->
       <div *ngIf="problemaExpandido === p.id" class="problema-body">
         <div class="solucion-box" *ngIf="p.solucion">
-          <span class="solucion-label">✅ Solución:</span>
+          <span class="solucion-label">Solución</span>
           <p>{{ p.solucion }}</p>
+        </div>
+
+        <div class="causa-probable-box" *ngIf="p.causas_probables?.length">
+          <span class="causa-label">Causa probable en e-Sueldos</span>
+          <div class="causa-grid">
+            <div class="causa-item" *ngFor="let c of p.causas_probables">
+              <strong>{{ c.codigo }}</strong>
+              <span>{{ c.descripcion || 'Concepto sin descripción' }}</span>
+              <small>AFIP {{ c.codigo_afip || '-' }} · LRT {{ c.contribuciones_lrt || '-' }}</small>
+            </div>
+          </div>
         </div>
 
         <div *ngIf="p.tutorial_pasos?.length" class="tutorial">
@@ -321,6 +382,88 @@
           </div>
           <div class="tabla-footer">
             <span>{{ p.filas_tabla.length }} registro(s) · {{ p.cuils_afectados }} CUIL(s) afectado(s)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Configuración -->
+  <div *ngIf="tabActiva === 'configuracion'" class="tab-content">
+    <div *ngIf="!informe.config_conceptos?.presente" class="config-empty">
+      <h3>No se cargó el TXT de conceptos</h3>
+      <p>Subilo junto con el LSD para validar parametrización, cobertura y causas probables desde e-Sueldos.</p>
+    </div>
+
+    <div *ngIf="informe.config_conceptos?.presente" class="config-dashboard">
+      <div class="config-kpi">
+        <span>Cobertura</span>
+        <strong>{{ informe.config_conceptos.cobertura }}%</strong>
+        <small>{{ informe.config_conceptos.conceptos_encontrados }}/{{ informe.config_conceptos.conceptos_usados }} conceptos usados</small>
+      </div>
+      <div class="config-kpi">
+        <span>Configurados</span>
+        <strong>{{ informe.config_conceptos.total_configurados }}</strong>
+        <small>{{ informe.config_conceptos.total_filas }} filas leídas</small>
+      </div>
+      <div class="config-kpi" [class.warning]="informe.config_conceptos.conceptos_faltantes">
+        <span>Faltantes</span>
+        <strong>{{ informe.config_conceptos.conceptos_faltantes }}</strong>
+        <small>usados en el LSD y ausentes en configuración</small>
+      </div>
+      <div class="config-kpi" [class.warning]="informe.config_conceptos.duplicados">
+        <span>Duplicados</span>
+        <strong>{{ informe.config_conceptos.duplicados }}</strong>
+        <small>códigos internos con configuración conflictiva</small>
+      </div>
+    </div>
+
+    <div *ngIf="problemasConfiguracion.length === 0 && informe.config_conceptos?.presente" class="no-problemas">
+      La configuración cargada cubre los conceptos usados en este LSD.
+    </div>
+
+    <div *ngFor="let p of problemasConfiguracion" class="problema-card configuracion" [ngClass]="p.severidad?.toLowerCase()">
+      <div class="problema-header" (click)="toggleProblema(p.id)">
+        <div class="problema-titulo-row">
+          <span class="badge" [ngClass]="p.severidad?.toLowerCase()">{{ p.severidad }}</span>
+          <h3>{{ p.titulo }}</h3>
+        </div>
+        <div class="problema-meta">
+          <span class="afectados-chip">{{ p.filas_tabla?.length || p.causas_probables?.length || 0 }} hallazgo(s)</span>
+          <span class="expand-icon">{{ problemaExpandido === p.id ? '▲' : '▼' }}</span>
+        </div>
+      </div>
+
+      <div class="problema-preview" (click)="toggleProblema(p.id)">
+        <p class="preview-causa" *ngIf="p.causa">
+          <span class="preview-label">Causa:</span> {{ p.causa }}
+        </p>
+      </div>
+
+      <div *ngIf="problemaExpandido === p.id" class="problema-body">
+        <div class="causa-probable-box" *ngIf="p.causas_probables?.length">
+          <span class="causa-label">Conceptos que probablemente originan la diferencia</span>
+          <div class="causa-grid">
+            <div class="causa-item" *ngFor="let c of p.causas_probables">
+              <strong>{{ c.codigo }}</strong>
+              <span>{{ c.descripcion || 'Concepto sin descripción' }}</span>
+              <small>AFIP {{ c.codigo_afip || '-' }} · LRT {{ c.contribuciones_lrt || '-' }}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabla-afectados-container" *ngIf="p.filas_tabla?.length">
+          <div class="tabla-scroll">
+            <table class="tabla-afectados">
+              <thead>
+                <tr><th *ngFor="let col of p.columnas_tabla">{{ col }}</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let fila of p.filas_tabla">
+                  <td *ngFor="let col of p.columnas_tabla">{{ fila[col] }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

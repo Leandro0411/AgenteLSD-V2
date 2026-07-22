@@ -12,7 +12,7 @@ const SCRIPT_PATH   = path.resolve(__dirname, '../../..', 'python_service', 'age
 // 👇 Definimos la ruta del JSON que va a leer Python
 const DYN_RULES_PATH = path.resolve(__dirname, '../../..', 'python_service', 'reglas_dinamicas.json');
 
-function analizarArchivo(rutaAbsolutaTxt, modo, onEvento, onEnd, onError) {
+function analizarArchivo(rutaAbsolutaTxt, modo, rutaConceptosTxt, onEvento, onEnd, onError) {
   if (!fs.existsSync(SCRIPT_PATH)) {
     onError(`Script Python no encontrado en: ${SCRIPT_PATH}`);
     return null;
@@ -35,7 +35,12 @@ function analizarArchivo(rutaAbsolutaTxt, modo, onEvento, onEnd, onError) {
       fs.writeFileSync(DYN_RULES_PATH, JSON.stringify(reglasDinamicas, null, 2), 'utf-8');
 
       // 3. Ahora sí, lanzamos Python
-      const proceso = spawn(PYTHON_EXEC, ['-u', SCRIPT_PATH, rutaAbsolutaTxt, '--modo', modoValido], {
+      const args = ['-u', SCRIPT_PATH, rutaAbsolutaTxt, '--modo', modoValido];
+      if (rutaConceptosTxt && fs.existsSync(rutaConceptosTxt)) {
+        args.push('--conceptos', rutaConceptosTxt);
+      }
+
+      const proceso = spawn(PYTHON_EXEC, args, {
         env: { ...process.env }, 
       });
 
@@ -68,6 +73,7 @@ function analizarArchivo(rutaAbsolutaTxt, modo, onEvento, onEnd, onError) {
           onEnd();
         }
         _limpiarArchivo(rutaAbsolutaTxt);
+        if (rutaConceptosTxt) _limpiarArchivo(rutaConceptosTxt);
       });
 
       proceso.on('error', (err) => {
@@ -78,6 +84,7 @@ function analizarArchivo(rutaAbsolutaTxt, modo, onEvento, onEnd, onError) {
       console.error('[pythonBridge] Error inyectando reglas dinámicas:', err);
       onError(`Error interno al preparar reglas dinámicas: ${err.message}`);
       _limpiarArchivo(rutaAbsolutaTxt);
+      if (rutaConceptosTxt) _limpiarArchivo(rutaConceptosTxt);
     }
   })();
 

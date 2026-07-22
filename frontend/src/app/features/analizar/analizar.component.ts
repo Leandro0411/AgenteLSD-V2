@@ -22,6 +22,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
   // ── Upload ──────────────────────────────────────────────────────────────────
   readonly modo = 'profundo' as const;
   archivoSeleccionado: File | null = null;
+  conceptosSeleccionado: File | null = null;
   dragOver = false;
 
   // ── Análisis en curso ───────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
   informe: any = null;
 
   // ── Panel activo en resultado ───────────────────────────────────────────────
-  tabActiva: 'resumen' | 'problemas' | 'chat' = 'resumen';
+  tabActiva: 'resumen' | 'problemas' | 'configuracion' | 'chat' = 'resumen';
   problemaExpandido: string | null = null;
 
   // ── Chat ────────────────────────────────────────────────────────────────────
@@ -98,6 +99,20 @@ export class AnalizarComponent implements OnInit, OnDestroy {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) this._seleccionarArchivo(file);
   }
+  onConceptosInput(e: Event): void {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      this.errorMsg = 'El archivo de conceptos también debe ser .txt';
+      return;
+    }
+    this.conceptosSeleccionado = file;
+    this.errorMsg = '';
+  }
+  quitarConceptos(e: Event): void {
+    e.stopPropagation();
+    this.conceptosSeleccionado = null;
+  }
   private _seleccionarArchivo(file: File): void {
     if (!file.name.toLowerCase().endsWith('.txt')) {
       this.errorMsg = 'Solo se aceptan archivos .txt';
@@ -115,7 +130,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
     this.informe = null;
     this.errorMsg = '';
 
-    this.lsd.uploadArchivo(this.archivoSeleccionado, this.modo).subscribe({
+    this.lsd.uploadArchivo(this.archivoSeleccionado, this.modo, this.conceptosSeleccionado).subscribe({
       next: (res) => {
         this.sessionId     = res.sessionId;
         this.nombreArchivo = res.archivo;
@@ -177,6 +192,7 @@ export class AnalizarComponent implements OnInit, OnDestroy {
   reiniciar(): void {
     this.estado              = 'idle';
     this.archivoSeleccionado = null;
+    this.conceptosSeleccionado = null;
     this.informe             = null;
     this.pasos               = [];
     this.progreso            = 0;
@@ -205,6 +221,27 @@ export class AnalizarComponent implements OnInit, OnDestroy {
   }
   get problemasAdvertencia(): any[] {
     return (this.informe?.problemas || []).filter((p: any) => p.severidad === 'ADVERTENCIA');
+  }
+  get problemasConfiguracion(): any[] {
+    return (this.informe?.problemas || []).filter((p: any) =>
+      p.id?.startsWith('LSD-CONFIG-') || p.causas_probables?.length
+    );
+  }
+  get problemasOperativos(): any[] {
+    return (this.informe?.problemas || []).filter((p: any) =>
+      !p.id?.startsWith('LSD-CONFIG-')
+    );
+  }
+  get estadoConfiguracion(): 'ok' | 'warning' | 'missing' {
+    const cfg = this.informe?.config_conceptos;
+    if (!cfg?.presente) return 'missing';
+    return cfg.conceptos_faltantes || cfg.duplicados ? 'warning' : 'ok';
+  }
+  get textoEstadoConfiguracion(): string {
+    const cfg = this.informe?.config_conceptos;
+    if (!cfg?.presente) return 'No cargado';
+    if (cfg.conceptos_faltantes || cfg.duplicados) return 'Revisar';
+    return 'OK';
   }
   toggleProblema(id: string): void {
     this.problemaExpandido = this.problemaExpandido === id ? null : id;

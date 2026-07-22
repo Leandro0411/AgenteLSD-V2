@@ -6,6 +6,7 @@ const historialSchema = new mongoose.Schema(
     sessionId: { type: String, required: true, unique: true, index: true },
     username: { type: String, required: true, index: true },
     nombreArchivo: { type: String, required: true },
+    nombreArchivoConceptos: String,
     chat: { type: [{ role: String, content: String }], default: [] },
     problemas: { type: mongoose.Schema.Types.Mixed, default: [] },
     veredicto: {
@@ -32,6 +33,7 @@ const historialSchema = new mongoose.Schema(
     modo_analisis: { type: String, default: 'auto' },
     completado: { type: Boolean, default: false },
     _rutaTmp:   { type: String, select: false }, // ruta temporal del TXT, no exponer al cliente
+    _rutaConceptosTmp: { type: String, select: false }, // export de conceptos opcional
   },
   { timestamps: { createdAt: 'fechaAnalisis', updatedAt: 'actualizadoEn' } }
 );

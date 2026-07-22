@@ -19,6 +19,7 @@ import os
 import json
 import re
 import time
+import csv
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
@@ -401,6 +402,20 @@ RULE_CATALOG = {
         "causa": "Se usó un concepto SAC semestral en un mes que no es de SAC.",
         "fix_hint": "Usar el concepto proporcional 120.003 con los días correspondientes para SAC complementaria en otros meses.",
     },
+    "LSD-CONFIG-CONCEPTO-FALTANTE": {
+        "severidad": "ADVERTENCIA", "campo": "Configuración de conceptos",
+        "fuente_pdf": "Export de Conceptos del Contribuyente",
+        "mensaje": "El TXT LSD usa conceptos internos que no aparecen en el TXT de conceptos de la empresa.",
+        "causa": "El archivo de conceptos no corresponde a la misma empresa/período o falta parametrizar conceptos usados en la liquidación.",
+        "fix_hint": "Subir el export actualizado de Conceptos del Contribuyente o revisar el alta del concepto en e-Sueldos.",
+    },
+    "LSD-CONFIG-CONCEPTO-REPETIDO": {
+        "severidad": "ADVERTENCIA", "campo": "Configuración de conceptos",
+        "fuente_pdf": "Export de Conceptos del Contribuyente",
+        "mensaje": "El TXT de conceptos contiene códigos internos repetidos con distinta configuración AFIP.",
+        "causa": "La parametrización exportada tiene más de una fila para el mismo código de contribuyente.",
+        "fix_hint": "Revisar duplicados en Conceptos del Contribuyente antes de validar el LSD.",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -665,7 +680,75 @@ def _leer_lineas(ruta: str) -> list[str]:
             continue
     raise ValueError(f"No se pudo decodificar {ruta}")
 
-def _construir_analisis(ruta: str) -> dict:
+def _normalizar_codigo(valor, largo_minimo=None) -> str:
+    codigo = re.sub(r'\D', '', str(valor or ''))
+    if largo_minimo and codigo:
+        return codigo.zfill(largo_minimo)
+    return codigo
+
+def _leer_config_conceptos(ruta):
+    if not ruta:
+        return None
+
+    lineas = _leer_lineas(ruta)
+    if not lineas:
+        return {"ruta": os.path.abspath(ruta), "conceptos": {}, "duplicados": [], "total_filas": 0}
+
+    reader = csv.reader(lineas, delimiter=';')
+    conceptos: dict[str, dict] = {}
+    duplicados = []
+
+    next(reader, None)
+    for nro, row in enumerate(reader, 2):
+        if len(row) < 4:
+            continue
+        codigo_interno = _normalizar_codigo(row[2], 4)
+        if not codigo_interno:
+            continue
+
+        concepto = {
+            "linea": nro,
+            "codigo_contribuyente": codigo_interno,
+            "descripcion_contribuyente": row[3].strip() if len(row) > 3 else "",
+            "codigo_afip": _normalizar_codigo(row[0]),
+            "descripcion_afip": row[1].strip() if len(row) > 1 else "",
+            "marca_repetible": row[4].strip() if len(row) > 4 else "",
+            "aportes_sipa": row[5].strip() if len(row) > 5 else "",
+            "contribuciones_sipa": row[6].strip() if len(row) > 6 else "",
+            "aportes_obra_social": row[9].strip() if len(row) > 9 else "",
+            "contribuciones_obra_social": row[10].strip() if len(row) > 10 else "",
+            "contribuciones_lrt": row[17].strip() if len(row) > 17 else "",
+        }
+
+        existente = conceptos.get(codigo_interno)
+        if existente and existente.get("codigo_afip") != concepto.get("codigo_afip"):
+            duplicados.append({"codigo": codigo_interno, "lineas": [existente.get("linea"), nro]})
+        conceptos[codigo_interno] = concepto
+
+    return {
+        "ruta": os.path.abspath(ruta),
+        "conceptos": conceptos,
+        "duplicados": duplicados,
+        "total_filas": max(len(lineas) - 1, 0),
+    }
+
+def _concepto_config_publico(conceptos_configurados: dict, codigo_interno: str):
+    cfg = conceptos_configurados.get(codigo_interno)
+    if not cfg:
+        return None
+    return {
+        "codigo": codigo_interno,
+        "codigo_afip": cfg.get("codigo_afip", ""),
+        "descripcion_afip": cfg.get("descripcion_afip", ""),
+        "descripcion_contribuyente": cfg.get("descripcion_contribuyente", ""),
+        "aportes_sipa": cfg.get("aportes_sipa", ""),
+        "contribuciones_sipa": cfg.get("contribuciones_sipa", ""),
+        "aportes_obra_social": cfg.get("aportes_obra_social", ""),
+        "contribuciones_obra_social": cfg.get("contribuciones_obra_social", ""),
+        "contribuciones_lrt": cfg.get("contribuciones_lrt", ""),
+    }
+
+def _construir_analisis(ruta: str, ruta_conceptos=None) -> dict:
     lineas = _leer_lineas(ruta)
     registros = []
     by_type: dict[str, list[dict]] = defaultdict(list)
@@ -702,18 +785,24 @@ def _construir_analisis(ruta: str) -> dict:
         "bases_por_cuil": dict(bases_por_cuil),
         "eventuales_por_cuil": dict(eventuales_por_cuil),
         "registros_por_tipo": {t: len(v) for t, v in by_type.items()},
+        "config_conceptos": _leer_config_conceptos(ruta_conceptos),
         "issues": [],
     }
     analisis["issues"] = ejecutar_reglas_deterministicas(analisis)
     return analisis
 
-def obtener_analisis_lsd(ruta: str) -> dict:
+def obtener_analisis_lsd(ruta: str, ruta_conceptos=None) -> dict:
     abs_path = os.path.abspath(ruta)
     stat = os.stat(abs_path)
-    key = (abs_path, stat.st_mtime, stat.st_size)
+    conceptos_key = None
+    if ruta_conceptos:
+        abs_conceptos = os.path.abspath(ruta_conceptos)
+        stat_conceptos = os.stat(abs_conceptos)
+        conceptos_key = (abs_conceptos, stat_conceptos.st_mtime, stat_conceptos.st_size)
+    key = (abs_path, stat.st_mtime, stat.st_size, conceptos_key)
     if key not in _ANALISIS_CACHE:
         _ANALISIS_CACHE.clear()
-        _ANALISIS_CACHE[key] = _construir_analisis(abs_path)
+        _ANALISIS_CACHE[key] = _construir_analisis(abs_path, ruta_conceptos)
     return _ANALISIS_CACHE[key]
 
 # ---------------------------------------------------------------------------
@@ -978,6 +1067,12 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         "0525", "0533", "0534", "0535", "0536", "0537", "0538", "0539",
         "0541", "0546", "0547", "0599",
     }
+    config_conceptos = analisis.get("config_conceptos") or {}
+    conceptos_configurados = config_conceptos.get("conceptos") or {}
+    for codigo_interno, concepto_cfg in conceptos_configurados.items():
+        codigo_afip = concepto_cfg.get("codigo_afip", "")
+        if codigo_afip.startswith("520") or codigo_afip == "799999":
+            CODIGOS_EXCLUIDOS_BASE9_ARCA.add(codigo_interno)
 
     # ── Validaciones de bases REG04 (matemáticas y de negocio) ───────────────
     mes_liq = "01"
@@ -1017,10 +1112,14 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                     continue
                 cod_interno = c.get("codigo_concepto", "").strip()
                 if cod_interno in CODIGOS_EXCLUIDOS_BASE9_ARCA:
-                    conceptos_excluidos_arca.append({
+                    concepto_detectado = {
                         "codigo": cod_interno,
                         "importe": str(imp),
-                    })
+                    }
+                    cfg_publica = _concepto_config_publico(conceptos_configurados, cod_interno)
+                    if cfg_publica:
+                        concepto_detectado.update(cfg_publica)
+                    conceptos_excluidos_arca.append(concepto_detectado)
                 else:
                     base9_determinada += imp
 
@@ -1036,6 +1135,7 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                                "determinado": str(base9_determinada),
                                "diferencia": str(diferencia_base9),
                                "conceptos_excluidos_por_arca": conceptos_excluidos_arca[:10],
+                               "conceptos_probables": conceptos_excluidos_arca[:10],
                                "legajo": legajo,
                            })
         elif base9 is not None and not tiene_cod_arca:
@@ -1196,6 +1296,40 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                 _add_issue(issues, "LSD-REG03-SAC-001", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"concepto": cod, "mes": periodo_mes})
 
+    # ── Cruce contra TXT de conceptos del contribuyente ──────────────────────
+    if config_conceptos:
+        usados: dict[str, dict] = {}
+        for reg in by_type.get("03", []):
+            codigo = _normalizar_codigo(reg.get("codigo_concepto"), 4)
+            if not codigo:
+                continue
+            entrada = usados.setdefault(codigo, {
+                "codigo": codigo,
+                "lineas": [],
+                "cuils": set(),
+                "ocurrencias": 0,
+            })
+            entrada["lineas"].append(reg.get("linea"))
+            if reg.get("cuil"):
+                entrada["cuils"].add(reg.get("cuil"))
+            entrada["ocurrencias"] += 1
+
+        for codigo, datos in sorted(usados.items()):
+            if codigo not in conceptos_configurados:
+                _add_issue(issues, "LSD-CONFIG-CONCEPTO-FALTANTE",
+                           linea=(datos["lineas"] or [None])[0],
+                           detalle={
+                               "codigo_contribuyente": codigo,
+                               "ocurrencias": datos["ocurrencias"],
+                               "cuils_afectados": len(datos["cuils"]),
+                               "lineas": datos["lineas"][:20],
+                           })
+
+        for dup in config_conceptos.get("duplicados", []):
+            _add_issue(issues, "LSD-CONFIG-CONCEPTO-REPETIDO",
+                       linea=(dup.get("lineas") or [None])[0],
+                       detalle=dup)
+
     # ── Evaluador de Reglas Dinámicas (Visual Rule Manager) ──────────────────
     for dyn in REGLAS_DINAMICAS:
         if not dyn.get("activa", True):
@@ -1244,8 +1378,8 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
 # FUNCIÓN PÚBLICA: ejecutar_validaciones_deterministicas
 # ---------------------------------------------------------------------------
 
-def ejecutar_validaciones_deterministicas(ruta: str) -> dict:
-    analisis = obtener_analisis_lsd(ruta)
+def ejecutar_validaciones_deterministicas(ruta: str, ruta_conceptos=None) -> dict:
+    analisis = obtener_analisis_lsd(ruta, ruta_conceptos)
     issues = analisis.get("issues", [])
     criticos = [i for i in issues if i.get("severidad") == "CRITICO"]
     advertencias = [i for i in issues if i.get("severidad") == "ADVERTENCIA"]
@@ -1264,12 +1398,22 @@ def _informe_deterministico(validacion: dict) -> dict:
 
     errores_criticos = validacion.get("errores_criticos", 0)
     advertencias     = validacion.get("advertencias", 0)
+    config_conceptos = validacion.get("config_conceptos") or None
     veredicto = "SERÁ RECHAZADO" if errores_criticos > 0 else "REVISAR" if advertencias > 0 else "PRESENTABLE"
 
     total_emp = len(validacion.get("empleados", {}))
     cuils_crit = {i.get("cuil") for i in validacion.get("issues", []) if i.get("severidad") == "CRITICO" and i.get("cuil")}
     cuils_adv  = {i.get("cuil") for i in validacion.get("issues", []) if i.get("severidad") == "ADVERTENCIA" and i.get("cuil")}
     cuils_adv_solo = cuils_adv - cuils_crit
+    conceptos_configurados = (config_conceptos or {}).get("conceptos", {})
+    conceptos_usados = sorted({
+        _normalizar_codigo(reg.get("codigo_concepto"), 4)
+        for reg in validacion.get("by_type", {}).get("03", [])
+        if _normalizar_codigo(reg.get("codigo_concepto"), 4)
+    })
+    conceptos_encontrados = [c for c in conceptos_usados if c in conceptos_configurados]
+    conceptos_faltantes = [c for c in conceptos_usados if c not in conceptos_configurados]
+    cobertura_config = round((len(conceptos_encontrados) / len(conceptos_usados)) * 100, 1) if conceptos_usados else 100
 
     # ── Formato de moneda ──────────────────────────────────────────────────────
     def _fmt_money(v):
@@ -1446,6 +1590,17 @@ def _informe_deterministico(validacion: dict) -> dict:
                 "Importe Restado (D) $": _fmt_money((item.get("detalle") or {}).get("importe")),
             }
         },
+        "config_conceptos": {
+            "ids": {"LSD-CONFIG-CONCEPTO-FALTANTE", "LSD-CONFIG-CONCEPTO-REPETIDO"},
+            "columnas": ["Línea", "Concepto interno", "Ocurrencias", "CUILs afectados", "Líneas del LSD"],
+            "extractor": lambda item: {
+                "Línea": str(item.get("linea") or "—"),
+                "Concepto interno": (item.get("detalle") or {}).get("codigo_contribuyente") or (item.get("detalle") or {}).get("codigo", "—"),
+                "Ocurrencias": str((item.get("detalle") or {}).get("ocurrencias", "—")),
+                "CUILs afectados": str((item.get("detalle") or {}).get("cuils_afectados", "—")),
+                "Líneas del LSD": str((item.get("detalle") or {}).get("lineas", "—")),
+            }
+        },
     }
 
     _rule_esquema: dict[str, dict] = {}
@@ -1480,6 +1635,22 @@ def _informe_deterministico(validacion: dict) -> dict:
                 for i in items
             ]
 
+        causas_probables = []
+        vistos_causas = set()
+        for item in items:
+            for concepto in (item.get("detalle") or {}).get("conceptos_probables", []):
+                codigo = concepto.get("codigo")
+                if not codigo or codigo in vistos_causas:
+                    continue
+                vistos_causas.add(codigo)
+                causas_probables.append({
+                    "codigo": codigo,
+                    "codigo_afip": concepto.get("codigo_afip", ""),
+                    "descripcion": concepto.get("descripcion_contribuyente") or concepto.get("descripcion_afip") or "",
+                    "contribuciones_lrt": concepto.get("contribuciones_lrt", ""),
+                    "importe_ejemplo": concepto.get("importe", ""),
+                })
+
         mensaje  = regla.get("mensaje") or first.get("mensaje", "")
         fix_hint = regla.get("fix_hint") or first.get("fix_hint", "")
         fuente   = regla.get("fuente_pdf", "")
@@ -1504,6 +1675,7 @@ def _informe_deterministico(validacion: dict) -> dict:
             "diagnostico_cruce":     "",
             "columnas_tabla":        columnas_tabla,
             "filas_tabla":           filas_tabla,
+            "causas_probables":      causas_probables[:12],
             "detalles":              items,
             "detalle_tecnico": {
                 "regla_id":         rule_id,
@@ -1548,6 +1720,17 @@ def _informe_deterministico(validacion: dict) -> dict:
         },
         "errores_arca": {"presente": False, "total": 0, "resumen": ""},
         "problemas":    problemas,
+        "config_conceptos": {
+            "presente": bool(config_conceptos),
+            "total_configurados": len((config_conceptos or {}).get("conceptos", {})),
+            "total_filas": (config_conceptos or {}).get("total_filas", 0),
+            "duplicados": len((config_conceptos or {}).get("duplicados", [])),
+            "conceptos_usados": len(conceptos_usados),
+            "conceptos_encontrados": len(conceptos_encontrados),
+            "conceptos_faltantes": len(conceptos_faltantes),
+            "cobertura": cobertura_config,
+            "faltantes": conceptos_faltantes[:30],
+        },
         # Campo extra para el chat contextual
         "validacion_deterministica": validacion,
     }
@@ -1564,12 +1747,12 @@ def emitir(tipo: str, **kwargs):
 # PUNTO DE ENTRADA PRINCIPAL
 # ---------------------------------------------------------------------------
 
-def ejecutar_analisis_completo(ruta_txt: str, modo: str = "auto"):
+def ejecutar_analisis_completo(ruta_txt: str, modo: str = "auto", ruta_conceptos=None):
     emitir("herramienta", nombre="validacion_deterministica",
            label="Ejecutando motor de validación determinística...")
 
     try:
-        deterministico = ejecutar_validaciones_deterministicas(ruta_txt)
+        deterministico = ejecutar_validaciones_deterministicas(ruta_txt, ruta_conceptos)
     except FileNotFoundError:
         emitir("error", mensaje=f"Archivo no encontrado: {ruta_txt}")
         return
@@ -1596,6 +1779,8 @@ if __name__ == '__main__':
     parser.add_argument("ruta", help="Ruta al archivo TXT de LSD")
     parser.add_argument("--modo", choices=["auto", "rapido", "profundo"], default="auto",
                         help="Modo de análisis (default: auto)")
+    parser.add_argument("--conceptos", default=None,
+                        help="Ruta opcional al TXT de Conceptos del Contribuyente")
     args = parser.parse_args()
 
-    ejecutar_analisis_completo(args.ruta, args.modo)
+    ejecutar_analisis_completo(args.ruta, args.modo, args.conceptos)

@@ -25,10 +25,15 @@ export class LsdService {
   constructor(private http: HttpClient) {}
 
   // ── Upload del TXT ──────────────────────────────────────────────────────────
-  uploadArchivo(archivo: File, modo: 'auto' | 'rapido' | 'profundo' = 'auto'): Observable<{ ok: boolean; sessionId: string; archivo: string }> {
+  uploadArchivo(
+    archivo: File,
+    modo: 'auto' | 'rapido' | 'profundo' = 'auto',
+    conceptos?: File | null
+  ): Observable<{ ok: boolean; sessionId: string; archivo: string; archivoConceptos?: string | null }> {
     const form = new FormData();
     form.append('archivo', archivo);
     form.append('modo', modo);
+    if (conceptos) form.append('conceptos', conceptos);
     return this.http.post<any>(`${this.API}/analizar/upload`, form);
   }
 
