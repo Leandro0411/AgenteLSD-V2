@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3uidados", "")
 # -*- coding: utf-8 -*-
 """
 agente_lsd.py — Motor de validación LSD para python_service (Node.js bridge)
@@ -191,9 +191,23 @@ RULE_CATALOG = {
     "LSD-REG02-CBU-001": {
         "severidad": "CRITICO", "campo": "REG02 CBU",
         "fuente_pdf": "LS_Conceptos_Basicos_y_Guia_de_Uso_V2.0.pdf",
-        "mensaje": "Si forma de pago es 3 (acreditación en cuenta), el CBU debe tener exactamente 22 dígitos en REG02 posiciones 74-95.",
-        "causa": "El empleado tiene forma de pago bancaria pero no tiene CBU cargado en el sistema.",
-        "fix_hint": "Completar un CBU válido o cambiar la forma de pago y regenerar el TXT.",
+        "mensaje": "Para el nro. liquidacion 1 la CBU es invalida.",
+        "causa": "El empleado tiene forma de pago bancaria pero la CBU ingresada no cumple con el algoritmo Módulo 10 de cuenta/sucursal o tiene un formato incorrecto.",
+        "fix_hint": "Completar una CBU real y válida para el empleado y regenerar el TXT.",
+    },
+    "LSD-REG02-CBU-002": {
+        "severidad": "CRITICO", "campo": "REG02 CBU",
+        "fuente_pdf": "LS_Conceptos_Basicos_y_Guia_de_Uso_V2.0.pdf",
+        "mensaje": "Para el nro. liquidacion 1 no corresponde informar la CBU.",
+        "causa": "El empleado tiene configurada la forma de pago en Efectivo (1) o Cheque (2), por lo tanto, el campo CBU debe ir obligatoriamente en blanco.",
+        "fix_hint": "Borrar la CBU del legajo (o asegurarse de que el exportador la omita) si el empleado cobra en efectivo/cheque y regenerar el TXT.",
+    },
+    "LSD-REG02-DIAS-001": {
+        "severidad": "CRITICO", "campo": "REG02 Días Liquidados",
+        "fuente_pdf": "LS_Conceptos_Basicos_y_Guia_de_Uso_V2.0.pdf",
+        "mensaje": "Cantidad de dias trabajados invalida",
+        "causa": "El campo de días liquidados en el REG02 informa '000', lo cual ARCA rechaza si existen bases imponibles para el empleado.",
+        "fix_hint": "Verificar la cantidad de días trabajados en el mes para este legajo y corregirlo antes de volver a exportar.",
     },
     "LSD-REG01-PERIOD-001": {
         "severidad": "CRITICO", "campo": "REG01 período",
@@ -250,6 +264,13 @@ RULE_CATALOG = {
         "mensaje": "La forma de pago debe ser 1 (Efectivo), 2 (Cheque) o 3 (Acreditación en cuenta).",
         "causa": "El empleado tiene una forma de pago inválida o sin configurar.",
         "fix_hint": "Seleccionar una forma de pago válida para el empleado.",
+    },
+    "LSD-REG03-DEBITO-AJUSTE": {
+        "severidad": "CRITICO", "campo": "REG03 Débito Invertido",
+        "fuente_pdf": "Errores Validacion AFIP",
+        "mensaje": "Concepto de liquidación informado como DÉBITO ('D') anómalo.",
+        "causa": "Se exportó un ajuste o concepto salarial con signo negativo (Débito). ARCA rechaza el cálculo de todas las bases imponibles (1 al 8) cuando se restan conceptos que deberían ir como Crédito.",
+        "fix_hint": "Revisar si el concepto se usó para descontar dinero indebidamente. Si es un descuento real, verificar que tenga el código ARCA de deducción correcto. Corregir y regenerar el TXT.",
     },
     "LSD-REG04-BASE-001": {
         "severidad": "ADVERTENCIA", "campo": "REG04 bases imponibles",
@@ -482,6 +503,23 @@ def _cuit_cuil_valido(valor: str) -> bool:
     if digito == 11: digito = 0
     elif digito == 10: digito = 9
     return digito == int(valor[-1])
+
+def _cbu_valido(cbu: str) -> bool:
+    if not re.fullmatch(r'\d{22}', cbu):
+        return False
+    # Validar primer bloque (Banco + Sucursal)
+    banco_suc = cbu[:7]
+    vd1 = int(cbu[7])
+    suma1 = sum(int(banco_suc[i]) * p for i, p in enumerate([7, 1, 3, 9, 7, 1, 3]))
+    if (10 - (suma1 % 10)) % 10 != vd1: return False
+    
+    # Validar segundo bloque (Cuenta)
+    cuenta = cbu[8:21]
+    vd2 = int(cbu[21])
+    suma2 = sum(int(cuenta[i]) * p for i, p in enumerate([3, 9, 7, 1, 3, 9, 7, 1, 3, 9, 7, 1, 3]))
+    if (10 - (suma2 % 10)) % 10 != vd2: return False
+    
+    return True
 
 def _sumar_conceptos(conceptos: list[dict], codigos: set[str]) -> Decimal:
     total = Decimal("0")
@@ -778,9 +816,11 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         cuil = reg.get("cuil", "")
         if not _cuit_cuil_valido(cuil):
             _add_issue(issues, "LSD-CUIL-FORMAT-001", linea=reg["linea"], cuil=cuil, detalle={"tipo": "02"})
+        
         forma_pago = reg.get("forma_pago", "")
         if forma_pago not in ("1", "2", "3"):
             _add_issue(issues, "LSD-REG02-FORMA-PAGO-001", linea=reg["linea"], cuil=cuil, detalle={"forma_pago": forma_pago})
+        
         fecha_pago    = reg.get("fecha_pago", "")
         fecha_rubrica = reg.get("fecha_rubrica", "")
         errores_fecha = []
@@ -791,16 +831,19 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         if errores_fecha:
             _add_issue(issues, "LSD-REG02-FECHA-001", linea=reg["linea"], cuil=cuil,
                        detalle={"errores": errores_fecha, "fecha_pago": fecha_pago, "fecha_rubrica": fecha_rubrica})
-        # CBU
+
+        # CBU Estricto ARCA
         cbu = reg.get("cbu", "")
         cbu_limpio = cbu.strip()
+        
         if forma_pago == "3":
-            if len(cbu) != 22 or not cbu.isdigit() or cbu == "0" * 22:
+            if not _cbu_valido(cbu):
                 _add_issue(issues, "LSD-REG02-CBU-001", linea=reg["linea"], cuil=cuil,
-                           detalle={"forma_pago": forma_pago, "cbu": cbu, "longitud": len(cbu)})
-        elif cbu_limpio and not cbu.isdigit():
-            _add_issue(issues, "LSD-REG02-CBU-001", linea=reg["linea"], cuil=cuil,
-                       detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "cbu_no_numerico"})
+                           detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "CBU inválida (Falla Módulo 10)"})
+        elif forma_pago in ("1", "2"):
+            if cbu_limpio:  # Si tiene algo escrito y debería estar vacío
+                _add_issue(issues, "LSD-REG02-CBU-002", linea=reg["linea"], cuil=cuil,
+                           detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "No corresponde informar CBU"})
 
     # ── Integridad por empleado ──────────────────────────────────────────────
     for tipo, index_name in (("03", "conceptos_por_cuil"), ("04", "bases_por_cuil"), ("05", "eventuales_por_cuil")):
@@ -846,12 +889,22 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         raw = reg["raw"]
         _add_numeric_issue(issues, reg, "cantidad", _slice(raw, REG03_CANTIDAD_START, REG03_CANTIDAD_END), 5)
         _add_numeric_issue(issues, reg, "importe",  _slice(raw, REG03_IMP_START, REG03_IMP_END),         15)
+        
         debito_credito = reg.get("debito_credito", "")
         if debito_credito not in ("D", "C"):
             _add_issue(issues, "LSD-REG03-DEB-CRED-001", linea=reg["linea"], cuil=reg.get("cuil"), detalle={"valor": debito_credito})
+            
         periodo_ajuste = _slice(raw, REG03_PERIODO_AJUSTE_START, REG03_PERIODO_AJUSTE_END)
         if not _periodo_yyyymm_valido(periodo_ajuste, permitir_blanco=True, permitir_ceros=True):
             _add_issue(issues, "LSD-REG03-AJUSTE-001", linea=reg["linea"], cuil=reg.get("cuil"), detalle={"periodo_ajuste": periodo_ajuste})
+
+        # Detectar Débitos anómalos (Ajustes negativos que ARCA rechaza en bases)
+        cod_interno = reg.get("codigo_concepto", "").strip()
+        if debito_credito == "D" and cod_interno.isdigit():
+            # Si el código es menor a 500 y NO es uno de los permitidos, sumamos el error
+            if int(cod_interno) < 500 and int(cod_interno) not in (33, 34, 416, 445, 446, 453, 454):
+                _add_issue(issues, "LSD-REG03-DEBITO-AJUSTE", linea=reg["linea"], cuil=reg.get("cuil"),
+                           detalle={"concepto": cod_interno, "importe": reg.get("importe")})
 
     campos_reg04 = [
         ("rem_bruta",    REG04_REM_BRUTA_START, REG04_REM_BRUTA_END),
@@ -972,7 +1025,9 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                     base9_determinada += imp
 
             diferencia_base9 = base9 - base9_determinada
-            if abs(diferencia_base9) > Decimal("1.00"):
+            # Solo es error si la base 9 informada es MAYOR a la determinada
+            # Si es menor, está bien: el consultor excluyó conceptos válidos.
+            if diferencia_base9 > Decimal("1.00"):
                 base9_arca_disparado = True
                 _add_issue(issues, "LSD-REG04-BASE9-ARCA", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={
@@ -1140,7 +1195,6 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             if 1200000 <= cod_int <= 1299999 and cod != "1200030":
                 _add_issue(issues, "LSD-REG03-SAC-001", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"concepto": cod, "mes": periodo_mes})
-
 
     # ── Evaluador de Reglas Dinámicas (Visual Rule Manager) ──────────────────
     for dyn in REGLAS_DINAMICAS:
@@ -1380,6 +1434,16 @@ def _informe_deterministico(validacion: dict) -> dict:
                 "CUIL":                item.get("cuil") or "—",
                 "Base 4 (OS) - raw":   (item.get("detalle") or {}).get("base4", "—"),
                 "Base 10 (Rem10) - raw":(item.get("detalle") or {}).get("base10", "—"),
+            }
+        },
+        "debito_ajuste": {
+            "ids": {"LSD-REG03-DEBITO-AJUSTE"},
+            "columnas": ["Línea", "CUIL", "Concepto Interno", "Importe Restado (D) $"],
+            "extractor": lambda item: {
+                "Línea": str(item.get("linea") or "—"),
+                "CUIL": item.get("cuil") or "—",
+                "Concepto Interno": (item.get("detalle") or {}).get("concepto", "—"),
+                "Importe Restado (D) $": _fmt_money((item.get("detalle") or {}).get("importe")),
             }
         },
     }
