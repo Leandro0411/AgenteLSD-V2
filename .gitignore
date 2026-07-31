@@ -17,7 +17,7 @@ venv/
 env/
 .Python
 
-# ─── VARIABLES DE ENTORNO Y SECRETOS (¡Crítico!) ───
+# ─── VARIABLES DE ENTORNO Y SECRETOS
 .env
 .env.*
 *.local
@@ -30,7 +30,7 @@ Txts/
 *.txt
 *.csv
 
-# Ignoramos el JSON local donde guardás las referencias de Gemini (opcional)
+# Ignoramos el JSON local donde guardamos las referencias de Gemini
 python_service/gemini_files.json
 
 # ─── IDEs Y EDITORES DE CÓDIGO ───

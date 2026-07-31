@@ -8,7 +8,7 @@ Protocolo: emite eventos JSON por stdout, línea a línea.
 Invocación: python agente_lsd.py <ruta_archivo.txt> [--modo auto|rapido|profundo]
 
 CAMBIOS RESPECTO AL SISTEMA VIEJO:
-  - Eliminadas las dependencias de Flask, google.genai y knowledge_loader.
+  - Eliminadas las dependencias Python heredadas de Flask y Gemini.
   - La IA la maneja el backend Node.js (chat.js). Este script solo hace validación determinística.
   - La salida es exclusivamente JSON por stdout (protocolo pythonBridge.js).
   - Se conserva el RULE_CATALOG completo, los parsers completos y las 25+ reglas de validación.
@@ -550,6 +550,41 @@ def _sumar_conceptos(conceptos: list[dict], codigos: set[str]) -> Decimal:
             total += importe
     return total
 
+def _sumar_conceptos_por_dc(conceptos: list[dict], codigos: set[str], debito_credito: str) -> Decimal:
+    total = Decimal("0")
+    codigos_norm = {_normalizar_codigo(c, 4) for c in codigos}
+    for concepto in conceptos:
+        codigo_raw = str(concepto.get("codigo_concepto", "") or "").strip()
+        if not re.fullmatch(r"\d+", codigo_raw):
+            continue
+        codigo = _normalizar_codigo(codigo_raw, 4)
+        if codigo not in codigos_norm:
+            continue
+        if concepto.get("debito_credito") != debito_credito:
+            continue
+        importe = concepto.get("importe")
+        if importe is not None:
+            total += importe
+    return total
+
+def _conceptos_por_dc_detalle(conceptos: list[dict], codigos: set[str], debito_credito: str) -> list[dict]:
+    codigos_norm = {_normalizar_codigo(c, 4) for c in codigos}
+    detalle = []
+    for concepto in conceptos:
+        codigo_raw = str(concepto.get("codigo_concepto", "") or "").strip()
+        if not re.fullmatch(r"\d+", codigo_raw):
+            continue
+        codigo = _normalizar_codigo(codigo_raw, 4)
+        if codigo not in codigos_norm or concepto.get("debito_credito") != debito_credito:
+            continue
+        detalle.append({
+            "linea": concepto.get("linea"),
+            "codigo": codigo,
+            "importe": str(concepto.get("importe") or Decimal("0")),
+            "debito_credito": debito_credito,
+        })
+    return detalle
+
 def _raws_conceptos(conceptos: list[dict], codigos: set[str], limite: int = 20) -> list[dict]:
     relacionados = []
     for concepto in conceptos:
@@ -748,6 +783,110 @@ def _concepto_config_publico(conceptos_configurados: dict, codigo_interno: str):
         "contribuciones_lrt": cfg.get("contribuciones_lrt", ""),
     }
 
+def _agrupar_conceptos_usados(validacion: dict, conceptos_configurados: dict) -> dict:
+    agrupados: dict[str, dict] = {}
+    for reg in validacion.get("by_type", {}).get("03", []):
+        codigo = _normalizar_codigo(reg.get("codigo_concepto"), 4)
+        if not codigo:
+            continue
+        item = agrupados.setdefault(codigo, {
+            "codigo": codigo,
+            "codigo_afip": "",
+            "descripcion": "",
+            "aportes_sipa": "",
+            "contribuciones_sipa": "",
+            "aportes_obra_social": "",
+            "contribuciones_obra_social": "",
+            "contribuciones_lrt": "",
+            "ocurrencias": 0,
+            "cuils": set(),
+            "lineas": [],
+            "importe_credito": Decimal("0"),
+            "importe_debito": Decimal("0"),
+            "reglas": set(),
+            "motivos": set(),
+        })
+        cfg = _concepto_config_publico(conceptos_configurados, codigo)
+        if cfg:
+            item.update({
+                "codigo_afip": cfg.get("codigo_afip", ""),
+                "descripcion": cfg.get("descripcion_contribuyente") or cfg.get("descripcion_afip", ""),
+                "aportes_sipa": cfg.get("aportes_sipa", ""),
+                "contribuciones_sipa": cfg.get("contribuciones_sipa", ""),
+                "aportes_obra_social": cfg.get("aportes_obra_social", ""),
+                "contribuciones_obra_social": cfg.get("contribuciones_obra_social", ""),
+                "contribuciones_lrt": cfg.get("contribuciones_lrt", ""),
+            })
+        item["ocurrencias"] += 1
+        if reg.get("cuil"):
+            item["cuils"].add(reg.get("cuil"))
+        item["lineas"].append(reg.get("linea"))
+        importe = reg.get("importe") or Decimal("0")
+        if reg.get("debito_credito") == "D":
+            item["importe_debito"] += importe
+        else:
+            item["importe_credito"] += importe
+    return agrupados
+
+def _diagnostico_configuracion(validacion: dict, problemas: list[dict], config_conceptos=None) -> dict:
+    conceptos_configurados = (config_conceptos or {}).get("conceptos", {})
+    conceptos = _agrupar_conceptos_usados(validacion, conceptos_configurados)
+
+    for problema in problemas:
+        for causa in problema.get("causas_probables", []) or []:
+            codigo = _normalizar_codigo(causa.get("codigo"), 4)
+            if codigo and codigo in conceptos:
+                conceptos[codigo]["reglas"].add(problema.get("id", ""))
+                conceptos[codigo]["motivos"].add("Probable impacto en bases imponibles")
+
+        if problema.get("id") == "LSD-CONFIG-CONCEPTO-FALTANTE":
+            for fila in problema.get("filas_tabla", []) or []:
+                codigo = _normalizar_codigo(fila.get("Concepto interno"), 4)
+                if codigo and codigo in conceptos:
+                    conceptos[codigo]["reglas"].add(problema.get("id", ""))
+                    conceptos[codigo]["motivos"].add("No aparece en el TXT de conceptos cargado")
+
+        if problema.get("id") == "LSD-REG03-DEBITO-AJUSTE":
+            for detalle in problema.get("detalles", []) or []:
+                codigo = _normalizar_codigo((detalle.get("detalle") or {}).get("concepto"), 4)
+                if codigo and codigo in conceptos:
+                    conceptos[codigo]["reglas"].add(problema.get("id", ""))
+                    conceptos[codigo]["motivos"].add("Informado como débito anómalo")
+
+    conceptos_problematicos = []
+    for item in conceptos.values():
+        codigo_afip = item.get("codigo_afip", "")
+        if codigo_afip.startswith("520") or codigo_afip == "799999":
+            item["motivos"].add("Familia AFIP excluida por ARCA para Base 9")
+        if item.get("contribuciones_lrt") == "1" and (codigo_afip.startswith("520") or codigo_afip == "799999"):
+            item["motivos"].add("Revisar LRT: concepto indemnizatorio/redondeo figura con contribuciones LRT")
+
+        if item["motivos"] or item["reglas"]:
+            conceptos_problematicos.append({
+                "codigo": item["codigo"],
+                "codigo_afip": item.get("codigo_afip", ""),
+                "descripcion": item.get("descripcion", ""),
+                "ocurrencias": item["ocurrencias"],
+                "cuils_afectados": len(item["cuils"]),
+                "lineas": item["lineas"][:20],
+                "importe_credito": str(item["importe_credito"]),
+                "importe_debito": str(item["importe_debito"]),
+                "aportes_sipa": item.get("aportes_sipa", ""),
+                "contribuciones_sipa": item.get("contribuciones_sipa", ""),
+                "aportes_obra_social": item.get("aportes_obra_social", ""),
+                "contribuciones_obra_social": item.get("contribuciones_obra_social", ""),
+                "contribuciones_lrt": item.get("contribuciones_lrt", ""),
+                "reglas": sorted(item["reglas"]),
+                "motivos": sorted(item["motivos"]),
+            })
+
+    conceptos_problematicos.sort(key=lambda c: (len(c["motivos"]) + len(c["reglas"]), c["ocurrencias"]), reverse=True)
+    return {
+        "presente": bool(config_conceptos),
+        "conceptos_problematicos": conceptos_problematicos,
+        "total_problematicos": len(conceptos_problematicos),
+    }
+
 def _construir_analisis(ruta: str, ruta_conceptos=None) -> dict:
     lineas = _leer_lineas(ruta)
     registros = []
@@ -929,10 +1068,9 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
             if not _cbu_valido(cbu):
                 _add_issue(issues, "LSD-REG02-CBU-001", linea=reg["linea"], cuil=cuil,
                            detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "CBU inválida (Falla Módulo 10)"})
-        elif forma_pago in ("1", "2"):
-            if cbu_limpio:  # Si tiene algo escrito y debería estar vacío
-                _add_issue(issues, "LSD-REG02-CBU-002", linea=reg["linea"], cuil=cuil,
-                           detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "No corresponde informar CBU"})
+        elif forma_pago in ("1", "2") and cbu_limpio and set(cbu_limpio) != {"0"}:
+            _add_issue(issues, "LSD-REG02-CBU-002", linea=reg["linea"], cuil=cuil,
+                       detalle={"forma_pago": forma_pago, "cbu": cbu, "problema": "CBU informada para forma de pago no bancaria"})
 
     # ── Integridad por empleado ──────────────────────────────────────────────
     for tipo, index_name in (("03", "conceptos_por_cuil"), ("04", "bases_por_cuil"), ("05", "eventuales_por_cuil")):
@@ -987,13 +1125,6 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         if not _periodo_yyyymm_valido(periodo_ajuste, permitir_blanco=True, permitir_ceros=True):
             _add_issue(issues, "LSD-REG03-AJUSTE-001", linea=reg["linea"], cuil=reg.get("cuil"), detalle={"periodo_ajuste": periodo_ajuste})
 
-        # Detectar Débitos anómalos (Ajustes negativos que ARCA rechaza en bases)
-        cod_interno = reg.get("codigo_concepto", "").strip()
-        if debito_credito == "D" and cod_interno.isdigit():
-            # Si el código es menor a 500 y NO es uno de los permitidos, sumamos el error
-            if int(cod_interno) < 500 and int(cod_interno) not in (33, 34, 416, 445, 446, 453, 454):
-                _add_issue(issues, "LSD-REG03-DEBITO-AJUSTE", linea=reg["linea"], cuil=reg.get("cuil"),
-                           detalle={"concepto": cod_interno, "importe": reg.get("importe")})
 
     campos_reg04 = [
         ("rem_bruta",    REG04_REM_BRUTA_START, REG04_REM_BRUTA_END),
@@ -1026,17 +1157,26 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
     # ── Comas, negativos y notación científica ───────────────────────────────
     for reg in registros:
         if reg["tipo"] in ("03", "04"):
-            campos = reg["raw"][13:] if len(reg["raw"]) > 13 else ""
-            if "," in campos:
-                posiciones = [13 + i for i, c in enumerate(campos) if c == ","]
+            # Aislamos ESTRICTAMENTE los bloques donde hay importes monetarios
+            campos_monetarios = ""
+            if reg["tipo"] == "03":
+                campos_monetarios = _slice(reg["raw"], 23, 44) # Abarca Cantidad e Importe
+            elif reg["tipo"] == "04":
+                campos_monetarios = _slice(reg["raw"], 160, 370) # Abarca todas las Bases y Detracciones
+
+            # Buscamos los caracteres prohibidos SOLO en los importes
+            if "," in campos_monetarios:
                 _add_issue(issues, "LSD-NUM-COMMA-001", linea=reg["linea"], cuil=reg.get("cuil"),
-                           detalle={"tipo": reg["tipo"], "posiciones": posiciones[:10]})
-            if re.search(r'\d[eE][+\-]?\d', campos):
+                           detalle={"tipo": reg["tipo"], "problema": "Coma detectada en importes"})
+            
+            if re.search(r'\d[eE][+\-]?\d', campos_monetarios):
                 _add_issue(issues, "LSD-NUM-SCI-001", linea=reg["linea"], cuil=reg.get("cuil"),
-                           detalle={"tipo": reg["tipo"], "extracto": campos[:80]})
-            if "-" in campos:
+                           detalle={"tipo": reg["tipo"], "problema": "Notación científica en importes"})
+            
+            if "-" in campos_monetarios:
                 _add_issue(issues, "LSD-NUM-NEG-001", linea=reg["linea"], cuil=reg.get("cuil"),
-                           detalle={"tipo": reg["tipo"]})
+                           detalle={"tipo": reg["tipo"], "problema": "Signo negativo detectado en importe"})
+                
     # ── REG04 duplicados ─────────────────────────────────────────────────────
     for cuil, regs in analisis["bases_por_cuil"].items():
         if len(regs) > 1:
@@ -1097,35 +1237,86 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         legajo   = (empleado.get("legajo") or "").strip()
         conceptos = analisis["conceptos_por_cuil"].get(reg["cuil"], [])
 
+        # Patrones ARCA observados cuando no se adjunta el TXT de Conceptos del Contribuyente.
+        # Estos códigos internos producen diferencias exactas en errores reales de ARCA:
+        # - 0013 informado como D: ARCA lo suma a bases remunerativas.
+        # - 0052/0054 informados como C: ARCA los excluye de bases 1/2/3/5/10.
+        # - 0416/0458/0459 informados como D: suelen explicar diferencias en bases OS/LRT.
+        ajuste_arca_rem = (
+            _sumar_conceptos_por_dc(conceptos, {"0013"}, "D")
+            - _sumar_conceptos_por_dc(conceptos, {"0052", "0054"}, "C")
+        )
+        ajuste_arca_os = (
+            _sumar_conceptos_por_dc(conceptos, {"0013"}, "D")
+            - _sumar_conceptos_por_dc(conceptos, {"0416", "0458", "0459"}, "D")
+        )
+        conceptos_ajuste_arca = (
+            _conceptos_por_dc_detalle(conceptos, {"0013"}, "D")
+            + _conceptos_por_dc_detalle(conceptos, {"0052", "0054"}, "C")
+            + _conceptos_por_dc_detalle(conceptos, {"0416", "0458", "0459"}, "D")
+        )
+
+        def _validar_base_observada(base_num: int, valor_informado: Decimal | None, ajuste: Decimal, patron: str) -> None:
+            if valor_informado is None or abs(ajuste) <= Decimal("0.01"):
+                return
+            determinado = valor_informado + ajuste
+            diferencia = valor_informado - determinado
+            if abs(diferencia) <= Decimal("1.00"):
+                return
+            _add_issue(issues, "LSD-REG04-BASES-CONCEPTOS-001", linea=reg["linea"], cuil=reg["cuil"],
+                       detalle={
+                           "patron": patron,
+                           "base": str(base_num),
+                           "informado": str(valor_informado),
+                           "determinado": str(determinado),
+                           "diferencia": str(diferencia),
+                           "legajo": legajo,
+                           "conceptos_probables": conceptos_ajuste_arca[:10],
+                       })
+
+        for base_num, valor_base in ((1, base1), (2, base2), (3, reg.get("base3")), (5, base5)):
+            _validar_base_observada(base_num, valor_base, ajuste_arca_rem, "ajuste_arca_conceptos_0013_0052_0054")
+        if base10 is not None:
+            _validar_base_observada(10, base10, ajuste_arca_rem, "ajuste_arca_conceptos_0013_0052_0054_detraccion")
+        for base_num, valor_base in ((4, base4), (8, reg.get("base8")), (9, base9)):
+            _validar_base_observada(base_num, valor_base, ajuste_arca_os, "ajuste_arca_conceptos_os_lrt")
+
         # Rastrea si BASE9-ARCA ya detectó error para este CUIL (para suprimir reglas redundantes)
         base9_arca_disparado = False
 
         if base9 is not None and conceptos:
-            # Fórmula ARCA exacta: suma créditos REG03 excluyendo indemnizatorios y redondeo
+            # Fórmula ARCA exacta: suma créditos REG03 y RESTA solo los débitos salariales
             base9_determinada = Decimal("0")
             conceptos_excluidos_arca = []
             for c in conceptos:
-                if c.get("debito_credito") != "C":
-                    continue
                 imp = c.get("importe")
                 if imp is None:
                     continue
-                cod_interno = c.get("codigo_concepto", "").strip()
-                if cod_interno in CODIGOS_EXCLUIDOS_BASE9_ARCA:
-                    concepto_detectado = {
-                        "codigo": cod_interno,
-                        "importe": str(imp),
-                    }
-                    cfg_publica = _concepto_config_publico(conceptos_configurados, cod_interno)
-                    if cfg_publica:
-                        concepto_detectado.update(cfg_publica)
-                    conceptos_excluidos_arca.append(concepto_detectado)
-                else:
-                    base9_determinada += imp
+                
+                # Normalizamos para sacarle el ".e-s" si lo tiene
+                cod_interno = _normalizar_codigo(c.get("codigo_concepto", ""))
+                deb_cred = c.get("debito_credito", "C")
+                
+                if deb_cred == "C":
+                    if cod_interno in CODIGOS_EXCLUIDOS_BASE9_ARCA:
+                        concepto_detectado = {
+                            "codigo": cod_interno,
+                            "importe": str(imp),
+                        }
+                        cfg_publica = _concepto_config_publico(conceptos_configurados, cod_interno)
+                        if cfg_publica:
+                            concepto_detectado.update(cfg_publica)
+                        conceptos_excluidos_arca.append(concepto_detectado)
+                    else:
+                        base9_determinada += imp
+                elif deb_cred == "D":
+                    # Magia AFIP: Solo restamos débitos que son descuentos de sueldo (< 500)
+                    # NO restamos las retenciones de ley (Jubilación, OS) que suelen ser >= 500
+                    if cod_interno and int(cod_interno) < 500:
+                        base9_determinada -= imp
 
             diferencia_base9 = base9 - base9_determinada
             # Solo es error si la base 9 informada es MAYOR a la determinada
-            # Si es menor, está bien: el consultor excluyó conceptos válidos.
             if diferencia_base9 > Decimal("1.00"):
                 base9_arca_disparado = True
                 _add_issue(issues, "LSD-REG04-BASE9-ARCA", linea=reg["linea"], cuil=reg["cuil"],
@@ -1156,8 +1347,6 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
         if importe_detraer is not None and importe_detraer > tope_detraccion:
             _add_issue(issues, "LSD-REG04-DETRACCION-MAX", linea=reg["linea"], cuil=reg["cuil"],
                        detalle={"importe_detraer": str(importe_detraer), "tope_maximo": str(tope_detraccion), "mes": mes_liq})
-
-
 
         # Tope proporcional SAC guillotinado (CORREGIDO)
         # Usa códigos internos de SAC: 0026 (SAC semestral) y 0027 (SAC proporcional)
@@ -1212,17 +1401,6 @@ def ejecutar_reglas_deterministicas(analisis: dict) -> list[dict]:
                 _add_issue(issues, "LSD-REG04-REM10-001", linea=reg["linea"], cuil=reg["cuil"],
                            detalle={"importe_detraer": str(importe_detraer), "rem10": str(base10)})
 
-        # Base 4 ≠ Base 5
-        if base4 is not None and base5 is not None and abs(base4 - base5) > Decimal("0.05"):
-            _add_issue(issues, "LSD-REG04-BASE4-BASE5-001", linea=reg["linea"], cuil=reg["cuil"],
-                       detalle={"base4": str(base4), "base5": str(base5),
-                                "diferencia": str(abs(base4 - base5))})
-
-        # Base 9 > Base 2 — solo si BASE9-ARCA no lo detectó ya con más precisión
-        if not base9_arca_disparado and base9 is not None and base2 is not None and base9 > base2 + Decimal("0.05"):
-            if base9 > (base2 + conceptos_no_rem + Decimal("0.05")):
-                _add_issue(issues, "LSD-REG04-BASE9-002", linea=reg["linea"], cuil=reg["cuil"],
-                           detalle={"base9": str(base9), "base2": str(base2)})
 
         # Base 9 = Base 2 con Base 1 < Base 2 (tope inconsistente)
         tolerancia = Decimal("0.01")
@@ -1704,6 +1882,8 @@ def _informe_deterministico(validacion: dict) -> dict:
             f"{tipos_crit} tipo(s) de problema · {errores_criticos} detecciones"
         )
 
+    diagnostico_configuracion = _diagnostico_configuracion(validacion, problemas, config_conceptos)
+
     return {
         "resumen":          resumen,
         "veredicto":        veredicto,
@@ -1720,6 +1900,7 @@ def _informe_deterministico(validacion: dict) -> dict:
         },
         "errores_arca": {"presente": False, "total": 0, "resumen": ""},
         "problemas":    problemas,
+        "diagnostico_configuracion": diagnostico_configuracion,
         "config_conceptos": {
             "presente": bool(config_conceptos),
             "total_configurados": len((config_conceptos or {}).get("conceptos", {})),
@@ -1747,7 +1928,7 @@ def emitir(tipo: str, **kwargs):
 # PUNTO DE ENTRADA PRINCIPAL
 # ---------------------------------------------------------------------------
 
-def ejecutar_analisis_completo(ruta_txt: str, modo: str = "auto", ruta_conceptos=None):
+def ejecutar_analisis_completo(ruta_txt: str, modo: str = "auto", ruta_conceptos=None, ruta_comparacion=None):
     emitir("herramienta", nombre="validacion_deterministica",
            label="Ejecutando motor de validación determinística...")
 
@@ -1768,6 +1949,17 @@ def ejecutar_analisis_completo(ruta_txt: str, modo: str = "auto", ruta_conceptos
 
     # Construir informe final
     informe = _informe_deterministico(deterministico)
+    if ruta_comparacion:
+        try:
+            comparado = ejecutar_validaciones_deterministicas(ruta_comparacion, ruta_conceptos)
+            informe["comparacion"] = comparar_validaciones(comparado, deterministico)
+        except Exception as e:
+            informe["comparacion"] = {
+                "presente": False,
+                "error": f"No se pudo comparar contra el segundo LSD: {e}",
+            }
+    else:
+        informe["comparacion"] = {"presente": False}
 
     emitir("informe_final", informe=informe)
 
@@ -1781,6 +1973,8 @@ if __name__ == '__main__':
                         help="Modo de análisis (default: auto)")
     parser.add_argument("--conceptos", default=None,
                         help="Ruta opcional al TXT de Conceptos del Contribuyente")
+    parser.add_argument("--comparar-con", default=None,
+                        help="Ruta opcional a otro TXT LSD para comparar antes/después")
     args = parser.parse_args()
 
-    ejecutar_analisis_completo(args.ruta, args.modo, args.conceptos)
+    ejecutar_analisis_completo(args.ruta, args.modo, args.conceptos, args.comparar_con)

@@ -5,7 +5,6 @@ import { Subscription }             from 'rxjs';
 import { LsdService, EventoSSE }    from '../../core/services/lsd.service';
 import { AuthService }              from '../../core/services/auth.service';
 import { AdminService }             from '../../core/services/admin.service';
-import * as XLSX from 'xlsx';
 
 type EstadoApp = 'idle' | 'uploading' | 'streaming' | 'completado' | 'error';
 
@@ -243,6 +242,9 @@ export class AnalizarComponent implements OnInit, OnDestroy {
     if (cfg.conceptos_faltantes || cfg.duplicados) return 'Revisar';
     return 'OK';
   }
+  get conceptosProblematicos(): any[] {
+    return this.informe?.diagnostico_configuracion?.conceptos_problematicos || [];
+  }
   toggleProblema(id: string): void {
     this.problemaExpandido = this.problemaExpandido === id ? null : id;
   }
@@ -356,55 +358,4 @@ export class AnalizarComponent implements OnInit, OnDestroy {
       });
   }
 
-  exportarReporteExcel(): void {
-  if (!this.informe || !this.informe.problemas) return;
-
-  // Mapeamos los datos para que las columnas sean legibles
-  const filasExcel = [];
-
-  for (const problema of this.informe.problemas) {
-    // Si el problema tiene el array "detalles" (que arma Python con la info de cada CUIL)
-    if (problema.detalles && problema.detalles.length > 0) {
-      for (const detalle of problema.detalles) {
-        filasExcel.push({
-          'Severidad': problema.severidad,
-          'Línea TXT': detalle.linea || '-',
-          'CUIL Afectado': detalle.cuil || '-',
-          'Problema': problema.titulo,
-          'Sugerencia de Solución': problema.solucion,
-          'Causa Técnica': problema.causa
-        });
-      }
-    } else {
-      // Si es un error genérico (ej: de estructura) que no tiene CUILs específicos
-      filasExcel.push({
-        'Severidad': problema.severidad,
-        'Línea TXT': '-',
-        'CUIL Afectado': 'Varios / Estructura',
-        'Problema': problema.titulo,
-        'Sugerencia de Solución': problema.solucion,
-        'Causa Técnica': problema.causa
-      });
-    }
-  }
-
-  // Creamos la hoja y el libro de Excel
-  const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(filasExcel);
-  const workbook: XLSX.WorkBook = XLSX.utils.book_new();
-  
-  // Ajustamos el ancho de las columnas para que se lea bien
-  worksheet['!cols'] = [
-    { wch: 15 }, // Severidad
-    { wch: 10 }, // Línea TXT
-    { wch: 15 }, // CUIL
-    { wch: 50 }, // Problema
-    { wch: 50 }, // Solución
-    { wch: 50 }  // Causa
-  ];
-
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Errores Detectados');
-
-  // Descargamos el archivo
-  XLSX.writeFile(workbook, `Reporte_LSD_${new Date().getTime()}.xlsx`);
-}
 }

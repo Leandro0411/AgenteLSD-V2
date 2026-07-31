@@ -44,7 +44,7 @@
       <button type="button" (click)="quitarConceptos($event)">Quitar</button>
     </div>
   </div>
-  
+
   <div class="error-banner" *ngIf="errorMsg">⚠️ {{ errorMsg }}</div>
 
   <button
@@ -108,7 +108,9 @@
       <h2 class="veredicto-titulo">{{ informe.veredicto }}</h2>
       <p class="veredicto-razon">{{ informe.veredicto_razon }}</p>
     </div>
-    <button class="btn-reiniciar" (click)="reiniciar()" id="btn-nuevo-analisis">+ Nuevo análisis</button>
+    <div class="veredicto-actions">
+      <button class="btn-reiniciar" (click)="reiniciar()" id="btn-nuevo-analisis">+ Nuevo análisis</button>
+    </div>
   </div>
 
   <!-- Stats -->
@@ -420,6 +422,28 @@
 
     <div *ngIf="problemasConfiguracion.length === 0 && informe.config_conceptos?.presente" class="no-problemas">
       La configuración cargada cubre los conceptos usados en este LSD.
+    </div>
+
+    <div *ngIf="conceptosProblematicos.length" class="compare-section">
+      <h3>Diagnóstico por concepto</h3>
+      <div class="concepto-diagnostico-grid">
+        <div class="concepto-diagnostico" *ngFor="let c of conceptosProblematicos">
+          <div class="concepto-diagnostico-head">
+            <strong>{{ c.codigo }}</strong>
+            <span>AFIP {{ c.codigo_afip || '-' }}</span>
+          </div>
+          <p>{{ c.descripcion || 'Concepto sin descripción' }}</p>
+          <div class="concepto-flags">
+            <span>SIPA {{ c.contribuciones_sipa || '-' }}</span>
+            <span>OS {{ c.contribuciones_obra_social || '-' }}</span>
+            <span>LRT {{ c.contribuciones_lrt || '-' }}</span>
+          </div>
+          <small>{{ c.ocurrencias }} ocurrencia(s) · {{ c.cuils_afectados }} CUIL(s)</small>
+          <ul>
+            <li *ngFor="let motivo of c.motivos">{{ motivo }}</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div *ngFor="let p of problemasConfiguracion" class="problema-card configuracion" [ngClass]="p.severidad?.toLowerCase()">

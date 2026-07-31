@@ -196,6 +196,8 @@ router.get('/stream/:sessionId', async (req, res) => {
               estadisticas:            informeFinal.estadisticas,
               errores_arca:            informeFinal.errores_arca,
               problemas:               informeFinal.problemas,
+              config_conceptos:         informeFinal.config_conceptos,
+              diagnostico_configuracion: informeFinal.diagnostico_configuracion,
               validacionDeterministica: informeFinal.validacion_deterministica,
               completado:              true,
             }

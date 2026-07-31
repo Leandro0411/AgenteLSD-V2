@@ -29,6 +29,8 @@ const historialSchema = new mongoose.Schema(
       total: { type: Number, default: 0 },
       resumen: String,
     },
+    config_conceptos: mongoose.Schema.Types.Mixed,
+    diagnostico_configuracion: mongoose.Schema.Types.Mixed,
     validacionDeterministica: mongoose.Schema.Types.Mixed,
     modo_analisis: { type: String, default: 'auto' },
     completado: { type: Boolean, default: false },

@@ -135,11 +135,17 @@
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+
+  &.ok {
+    background: #DCFCE7;
+    border-color: #86EFAC;
+    color: #166534;
+  }
 }
 
 .diagnostico-rapido {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 18px 0 22px;
 
@@ -273,6 +279,12 @@
     background: #FFFBEB;
     strong { color: #92400E; }
   }
+
+  &.ok {
+    border-color: #BBF7D0;
+    background: #F0FDF4;
+    strong { color: #166534; }
+  }
 }
 
 .causa-probable-box {
@@ -321,6 +333,100 @@
     color: #64748B;
     font-size: 12px;
   }
+}
+
+.veredicto-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.compare-section {
+  margin-top: 18px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+
+  h3 {
+    margin: 0 0 12px;
+    color: #1E293B;
+    font-size: 15px;
+    font-weight: 700;
+  }
+}
+
+.concepto-diagnostico-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.concepto-diagnostico {
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 12px;
+  background: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  p {
+    margin: 0;
+    color: #1E293B;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  small {
+    color: #64748B;
+    font-size: 12px;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
+.concepto-diagnostico-head,
+.concepto-flags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.concepto-diagnostico-head {
+  strong {
+    color: #1D4ED8;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    background: #DBEAFE;
+    color: #1E40AF;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+}
+
+.concepto-flags span {
+  background: #E2E8F0;
+  color: #334155;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ── TABLA DE EMPLEADOS AFECTADOS ── */
